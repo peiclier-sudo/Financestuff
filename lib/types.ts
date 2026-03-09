@@ -19,6 +19,16 @@ export interface TradingDay {
   rangePercent: number; // (high - low) / open * 100
   changePercent: number; // (close - open) / open * 100
   bars: Bar[];
+  // Previous day characteristics
+  prevDayDirection: "bullish" | "bearish" | null;
+  prevDayChangePercent: number | null;
+  prevDayRangePercent: number | null;
+  prevDayGapPercent: number | null;
+  // Intraday stats
+  bodyPercent: number; // abs(close - open) / open * 100
+  upperWickPercent: number; // (high - max(open,close)) / open * 100
+  lowerWickPercent: number; // (min(open,close) - low) / open * 100
+  closeLocation: number; // where close sits in the range: 0=low, 1=high
 }
 
 export interface FilterCriteria {
@@ -31,4 +41,10 @@ export interface FilterCriteria {
   direction: "bullish" | "bearish" | "any"; // close vs open
   dateFrom: string;
   dateTo: string;
+  // New criteria
+  prevDayDirection: "bullish" | "bearish" | "any";
+  minChangePercent: number;
+  maxChangePercent: number;
+  prevDayMinChangePercent: number;
+  prevDayMaxChangePercent: number;
 }

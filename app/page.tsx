@@ -2,10 +2,13 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { TradingDay, FilterCriteria } from "@/lib/types";
-import { parseCSV, groupIntoDays, filterDays } from "@/lib/dataUtils";
+import { parseCSV, groupIntoDays, filterDays, computeStats } from "@/lib/dataUtils";
 import FilterPanel from "./components/FilterPanel";
 import DayList from "./components/DayList";
 import CandlestickChart from "./components/CandlestickChart";
+import StatsBar from "./components/StatsBar";
+import DaySummary from "./components/DaySummary";
+import AIAnalysis from "./components/AIAnalysis";
 
 const DEFAULT_CRITERIA: FilterCriteria = {
   dayOfWeek: null,
@@ -17,6 +20,11 @@ const DEFAULT_CRITERIA: FilterCriteria = {
   direction: "any",
   dateFrom: "",
   dateTo: "",
+  prevDayDirection: "any",
+  minChangePercent: 0,
+  maxChangePercent: 0,
+  prevDayMinChangePercent: 0,
+  prevDayMaxChangePercent: 0,
 };
 
 export default function Home() {
@@ -29,7 +37,7 @@ export default function Home() {
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
       .then((res) => {
-        if (!res.ok) throw new Error("CSV file not found. Please add NASDAQ_5min_NDX_From_2015.csv to the public/ folder.");
+        if (!res.ok) throw new Error("CSV not found in public/");
         return res.text();
       })
       .then((text) => {
@@ -45,20 +53,28 @@ export default function Home() {
   }, []);
 
   const filteredDays = useMemo(() => filterDays(allDays, criteria), [allDays, criteria]);
+  const stats = useMemo(() => computeStats(filteredDays), [filteredDays]);
 
   const selectedDay = useMemo(
     () => (selectedDate ? allDays.find((d) => d.date === selectedDate) ?? null : null),
     [allDays, selectedDate]
   );
 
-  // Keyboard navigation through filtered days
   const handleSelect = useCallback((date: string) => {
     setSelectedDate(date);
   }, []);
 
+  const handleReset = useCallback(() => {
+    setCriteria(DEFAULT_CRITERIA);
+  }, []);
+
+  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!filteredDays.length) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "SELECT") return;
+
       const currentIndex = filteredDays.findIndex((d) => d.date === selectedDate);
 
       if (e.key === "ArrowDown" || e.key === "j") {
@@ -77,10 +93,10 @@ export default function Home() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-2 border-[#3b82f6] border-t-transparent rounded-full mx-auto mb-4" />
-          <p className="text-[#888]">Loading NASDAQ data...</p>
+          <div className="animate-spin w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full mx-auto mb-3" />
+          <p className="text-[var(--text-muted)] text-sm">Loading NASDAQ data...</p>
         </div>
       </div>
     );
@@ -88,101 +104,79 @@ export default function Home() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="bg-[#141414] border border-[#ef4444]/30 rounded-lg p-8 max-w-md text-center">
-          <p className="text-[#ef4444] font-semibold mb-2">Error loading data</p>
-          <p className="text-[#888] text-sm">{error}</p>
+      <div className="h-screen flex items-center justify-center">
+        <div className="bg-[var(--surface)] border border-[var(--red-dim)] rounded-lg p-8 max-w-md text-center">
+          <p className="text-[var(--red)] font-semibold mb-2">Error</p>
+          <p className="text-[var(--text-muted)] text-sm">{error}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen p-4 md:p-6 max-w-[1600px] mx-auto space-y-4">
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">NASDAQ Day Filter</h1>
-          <p className="text-sm text-[#888]">
-            {allDays.length} trading days &middot; {allDays[0]?.date} to {allDays[allDays.length - 1]?.date}
-          </p>
+    <div className="h-screen flex flex-col p-2 gap-2 overflow-hidden">
+      {/* Header */}
+      <header className="flex items-center justify-between px-1 flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <h1 className="text-sm font-bold tracking-tight">NDX Day Filter</h1>
+          <span className="text-[10px] text-[var(--text-dim)] font-mono">
+            {allDays[0]?.date} → {allDays[allDays.length - 1]?.date}
+          </span>
         </div>
-        <p className="text-xs text-[#888]">Arrow keys or j/k to navigate</p>
+        <span className="text-[10px] text-[var(--text-dim)]">↑↓ or j/k to navigate</span>
       </header>
 
-      <FilterPanel
-        criteria={criteria}
-        onChange={setCriteria}
-        resultCount={filteredDays.length}
-        totalCount={allDays.length}
-      />
+      {/* Filters */}
+      <div className="flex-shrink-0">
+        <FilterPanel
+          criteria={criteria}
+          onChange={setCriteria}
+          resultCount={filteredDays.length}
+          totalCount={allDays.length}
+          onReset={handleReset}
+        />
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <DayList days={filteredDays} selectedDate={selectedDate} onSelect={handleSelect} />
+      {/* Stats bar */}
+      <div className="flex-shrink-0">
+        <StatsBar stats={stats} />
+      </div>
 
-        <div className="space-y-4">
+      {/* Main content: 3 columns */}
+      <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
+        {/* Left: Day list */}
+        <div className="col-span-4 min-h-0">
+          <DayList days={filteredDays} selectedDate={selectedDate} onSelect={handleSelect} />
+        </div>
+
+        {/* Center: Chart + Summary */}
+        <div className="col-span-4 flex flex-col gap-2 min-h-0">
           {selectedDay ? (
             <>
-              <CandlestickChart
-                bars={selectedDay.bars}
-                title={`${selectedDay.date} (${selectedDay.dayName}) — ${selectedDay.bars.length} bars`}
-              />
-              <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg p-4">
-                <h3 className="text-sm font-semibold text-[#888] mb-3">Day Summary</h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div>
-                    <span className="text-[#888]">Open</span>
-                    <p className="font-mono">{selectedDay.open.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">High</span>
-                    <p className="font-mono">{selectedDay.high.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Low</span>
-                    <p className="font-mono">{selectedDay.low.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Close</span>
-                    <p className="font-mono">{selectedDay.close.toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Gap</span>
-                    <p className={`font-mono ${
-                      selectedDay.gapPercent === null ? "text-[#888]" :
-                      selectedDay.gapPercent > 0 ? "text-[#22c55e]" : "text-[#ef4444]"
-                    }`}>
-                      {selectedDay.gapPercent !== null
-                        ? `${selectedDay.gapPercent > 0 ? "+" : ""}${selectedDay.gapPercent.toFixed(3)}%`
-                        : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Change</span>
-                    <p className={`font-mono ${
-                      selectedDay.changePercent > 0 ? "text-[#22c55e]" : "text-[#ef4444]"
-                    }`}>
-                      {selectedDay.changePercent > 0 ? "+" : ""}{selectedDay.changePercent.toFixed(3)}%
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Range</span>
-                    <p className="font-mono">{selectedDay.rangePercent.toFixed(3)}%</p>
-                  </div>
-                  <div>
-                    <span className="text-[#888]">Prev Close</span>
-                    <p className="font-mono">
-                      {selectedDay.prevClose !== null ? selectedDay.prevClose.toFixed(2) : "—"}
-                    </p>
-                  </div>
-                </div>
+              <div className="flex-1 min-h-0">
+                <CandlestickChart
+                  bars={selectedDay.bars}
+                  title={`${selectedDay.date} ${selectedDay.dayName} — ${selectedDay.bars.length} bars`}
+                  height={280}
+                />
+              </div>
+              <div className="flex-shrink-0">
+                <DaySummary day={selectedDay} />
               </div>
             </>
           ) : (
-            <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg p-16 text-center text-[#888]">
-              <p className="text-lg mb-2">Select a day to view its chart</p>
-              <p className="text-sm">Click any row in the table or use arrow keys to navigate</p>
+            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full">
+              <div className="text-center">
+                <p className="text-[var(--text-dim)] text-sm mb-1">Select a day</p>
+                <p className="text-[var(--text-dim)] text-[10px]">Click a row or use arrow keys</p>
+              </div>
             </div>
           )}
+        </div>
+
+        {/* Right: AI Analysis */}
+        <div className="col-span-4 min-h-0">
+          <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
         </div>
       </div>
     </div>
