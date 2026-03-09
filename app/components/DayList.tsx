@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { TradingDay } from "@/lib/types";
 
 interface Props {
@@ -9,63 +10,97 @@ interface Props {
 }
 
 export default function DayList({ days, selectedDate, onSelect }: Props) {
+  const selectedRef = useRef<HTMLTableRowElement>(null);
+
+  useEffect(() => {
+    if (selectedRef.current) {
+      selectedRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedDate]);
+
   if (days.length === 0) {
     return (
-      <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg p-8 text-center text-[#888]">
-        No days match your filter criteria. Try adjusting the filters.
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full text-[var(--text-muted)] text-sm">
+        No days match your filters
       </div>
     );
   }
 
   return (
-    <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg overflow-hidden">
-      <div className="max-h-[600px] overflow-y-auto">
-        <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-[#1a1a1a] border-b border-[#2a2a2a]">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+      <div className="overflow-y-auto flex-1">
+        <table className="w-full text-[11px]">
+          <thead className="sticky top-0 bg-[var(--surface-2)] border-b border-[var(--border)] z-10">
             <tr>
-              <th className="text-left px-3 py-2 text-[#888] font-medium">Date</th>
-              <th className="text-left px-3 py-2 text-[#888] font-medium">Day</th>
-              <th className="text-right px-3 py-2 text-[#888] font-medium">Open</th>
-              <th className="text-right px-3 py-2 text-[#888] font-medium">Close</th>
-              <th className="text-right px-3 py-2 text-[#888] font-medium">Gap %</th>
-              <th className="text-right px-3 py-2 text-[#888] font-medium">Change %</th>
-              <th className="text-right px-3 py-2 text-[#888] font-medium">Range %</th>
+              <th className="text-left px-2 py-1.5 text-[var(--text-dim)] font-medium">Date</th>
+              <th className="text-center px-1 py-1.5 text-[var(--text-dim)] font-medium w-8">D</th>
+              <th className="text-center px-1 py-1.5 text-[var(--text-dim)] font-medium w-8">Prev</th>
+              <th className="text-right px-2 py-1.5 text-[var(--text-dim)] font-medium">Gap%</th>
+              <th className="text-right px-2 py-1.5 text-[var(--text-dim)] font-medium">Chg%</th>
+              <th className="text-right px-2 py-1.5 text-[var(--text-dim)] font-medium">Rng%</th>
+              <th className="text-right px-2 py-1.5 text-[var(--text-dim)] font-medium w-14">Close</th>
             </tr>
           </thead>
           <tbody>
-            {days.map((day) => (
-              <tr
-                key={day.date}
-                onClick={() => onSelect(day.date)}
-                className={`cursor-pointer border-b border-[#1e1e1e] transition-colors ${
-                  selectedDate === day.date
-                    ? "bg-[#1a2332]"
-                    : "hover:bg-[#1a1a1a]"
-                }`}
-              >
-                <td className="px-3 py-2 font-mono">{day.date}</td>
-                <td className="px-3 py-2">{day.dayName.slice(0, 3)}</td>
-                <td className="px-3 py-2 text-right font-mono">{day.open.toFixed(2)}</td>
-                <td className="px-3 py-2 text-right font-mono">{day.close.toFixed(2)}</td>
-                <td className={`px-3 py-2 text-right font-mono ${
-                  day.gapPercent === null ? "text-[#888]" :
-                  day.gapPercent > 0 ? "text-[#22c55e]" : "text-[#ef4444]"
-                }`}>
-                  {day.gapPercent !== null ? `${day.gapPercent > 0 ? "+" : ""}${day.gapPercent.toFixed(2)}%` : "—"}
-                </td>
-                <td className={`px-3 py-2 text-right font-mono ${
-                  day.changePercent > 0 ? "text-[#22c55e]" : "text-[#ef4444]"
-                }`}>
-                  {day.changePercent > 0 ? "+" : ""}{day.changePercent.toFixed(2)}%
-                </td>
-                <td className="px-3 py-2 text-right font-mono">
-                  {day.rangePercent.toFixed(2)}%
-                </td>
-              </tr>
-            ))}
+            {days.map((day) => {
+              const isSelected = selectedDate === day.date;
+              return (
+                <tr
+                  key={day.date}
+                  ref={isSelected ? selectedRef : undefined}
+                  onClick={() => onSelect(day.date)}
+                  className={`cursor-pointer border-b border-[var(--border)] transition-all duration-100 ${
+                    isSelected
+                      ? "bg-[var(--accent-dim)]/15 border-l-2 border-l-[var(--accent)]"
+                      : "hover:bg-[var(--surface-hover)] border-l-2 border-l-transparent"
+                  }`}
+                >
+                  <td className="px-2 py-1 font-mono text-[var(--text-muted)]">
+                    {day.date.slice(5)} <span className="text-[var(--text-dim)]">{day.dayName.slice(0, 2)}</span>
+                  </td>
+                  <td className="px-1 py-1 text-center">
+                    <DirDot dir={day.changePercent > 0 ? "bull" : "bear"} />
+                  </td>
+                  <td className="px-1 py-1 text-center">
+                    {day.prevDayDirection ? (
+                      <DirDot dir={day.prevDayDirection === "bullish" ? "bull" : "bear"} />
+                    ) : (
+                      <span className="text-[var(--text-dim)]">—</span>
+                    )}
+                  </td>
+                  <td className={`px-2 py-1 text-right font-mono ${
+                    day.gapPercent === null ? "text-[var(--text-dim)]" :
+                    day.gapPercent > 0 ? "text-[var(--green)]" : "text-[var(--red)]"
+                  }`}>
+                    {day.gapPercent !== null ? `${day.gapPercent > 0 ? "+" : ""}${day.gapPercent.toFixed(2)}` : "—"}
+                  </td>
+                  <td className={`px-2 py-1 text-right font-mono font-medium ${
+                    day.changePercent > 0 ? "text-[var(--green)]" : "text-[var(--red)]"
+                  }`}>
+                    {day.changePercent > 0 ? "+" : ""}{day.changePercent.toFixed(2)}
+                  </td>
+                  <td className="px-2 py-1 text-right font-mono text-[var(--text-muted)]">
+                    {day.rangePercent.toFixed(2)}
+                  </td>
+                  <td className="px-2 py-1 text-right font-mono text-[var(--text-dim)]">
+                    {day.close.toFixed(0)}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </div>
+  );
+}
+
+function DirDot({ dir }: { dir: "bull" | "bear" }) {
+  return (
+    <span
+      className={`inline-block w-2 h-2 rounded-full ${
+        dir === "bull" ? "bg-[var(--green)]" : "bg-[var(--red)]"
+      }`}
+    />
   );
 }

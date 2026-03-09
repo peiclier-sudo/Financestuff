@@ -7,150 +7,168 @@ interface Props {
   onChange: (criteria: FilterCriteria) => void;
   resultCount: number;
   totalCount: number;
+  onReset: () => void;
 }
 
-export default function FilterPanel({ criteria, onChange, resultCount, totalCount }: Props) {
+export default function FilterPanel({ criteria, onChange, resultCount, totalCount, onReset }: Props) {
   const update = (patch: Partial<FilterCriteria>) => {
     onChange({ ...criteria, ...patch });
   };
 
+  const pct = totalCount > 0 ? ((resultCount / totalCount) * 100).toFixed(0) : "0";
+
   return (
-    <div className="bg-[#141414] border border-[#2a2a2a] rounded-lg p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold">Filters</h2>
-        <span className="text-sm text-[#888]">
-          {resultCount} / {totalCount} days
-        </span>
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
+      {/* Header bar */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]">
+        <div className="flex items-center gap-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Filters</h2>
+          <div className="flex items-center gap-1.5">
+            <span className="stat-badge blue">{resultCount.toLocaleString()} / {totalCount.toLocaleString()}</span>
+            <span className="text-[10px] text-[var(--text-dim)]">({pct}%)</span>
+          </div>
+        </div>
+        <button
+          onClick={onReset}
+          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+        >
+          Reset all
+        </button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-        {/* Day of Week */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Day of Week</label>
-          <select
-            value={criteria.dayOfWeek ?? "any"}
-            onChange={(e) =>
-              update({ dayOfWeek: e.target.value === "any" ? null : parseInt(e.target.value) })
-            }
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          >
-            <option value="any">Any</option>
-            <option value="1">Monday</option>
-            <option value="2">Tuesday</option>
-            <option value="3">Wednesday</option>
-            <option value="4">Thursday</option>
-            <option value="5">Friday</option>
-          </select>
-        </div>
+      <div className="px-3 py-2">
+        <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-x-3 gap-y-2">
+          {/* Day of Week */}
+          <Field label="Day">
+            <select
+              value={criteria.dayOfWeek ?? "any"}
+              onChange={(e) => update({ dayOfWeek: e.target.value === "any" ? null : parseInt(e.target.value) })}
+            >
+              <option value="any">Any</option>
+              <option value="1">Mon</option>
+              <option value="2">Tue</option>
+              <option value="3">Wed</option>
+              <option value="4">Thu</option>
+              <option value="5">Fri</option>
+            </select>
+          </Field>
 
-        {/* Gap Direction */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Gap Direction</label>
-          <select
-            value={criteria.gapDirection}
-            onChange={(e) =>
-              update({ gapDirection: e.target.value as "up" | "down" | "any" })
-            }
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          >
-            <option value="any">Any</option>
-            <option value="up">Gap Up</option>
-            <option value="down">Gap Down</option>
-          </select>
-        </div>
+          {/* Gap Direction */}
+          <Field label="Gap Dir">
+            <select
+              value={criteria.gapDirection}
+              onChange={(e) => update({ gapDirection: e.target.value as "up" | "down" | "any" })}
+            >
+              <option value="any">Any</option>
+              <option value="up">Up</option>
+              <option value="down">Down</option>
+            </select>
+          </Field>
 
-        {/* Day Direction */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Day Direction</label>
-          <select
-            value={criteria.direction}
-            onChange={(e) =>
-              update({ direction: e.target.value as "bullish" | "bearish" | "any" })
-            }
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          >
-            <option value="any">Any</option>
-            <option value="bullish">Bullish (Close &gt; Open)</option>
-            <option value="bearish">Bearish (Close &lt; Open)</option>
-          </select>
-        </div>
+          {/* Day Direction */}
+          <Field label="Direction">
+            <select
+              value={criteria.direction}
+              onChange={(e) => update({ direction: e.target.value as "bullish" | "bearish" | "any" })}
+            >
+              <option value="any">Any</option>
+              <option value="bullish">Bull</option>
+              <option value="bearish">Bear</option>
+            </select>
+          </Field>
 
-        {/* Min Gap % */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Min Gap %</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={criteria.minGapPercent}
-            onChange={(e) => update({ minGapPercent: parseFloat(e.target.value) || 0 })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          />
-        </div>
+          {/* Previous Day */}
+          <Field label="Prev Day">
+            <select
+              value={criteria.prevDayDirection}
+              onChange={(e) => update({ prevDayDirection: e.target.value as "bullish" | "bearish" | "any" })}
+            >
+              <option value="any">Any</option>
+              <option value="bullish">Bull</option>
+              <option value="bearish">Bear</option>
+            </select>
+          </Field>
 
-        {/* Max Gap % */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Max Gap %</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={criteria.maxGapPercent}
-            onChange={(e) => update({ maxGapPercent: parseFloat(e.target.value) || 0 })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-            placeholder="0 = no limit"
-          />
-        </div>
+          {/* Gap % range */}
+          <Field label="Gap % Min">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.minGapPercent || ""}
+              placeholder="0"
+              onChange={(e) => update({ minGapPercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
+          <Field label="Gap % Max">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.maxGapPercent || ""}
+              placeholder="∞"
+              onChange={(e) => update({ maxGapPercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
 
-        {/* Min Range % */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Min Range %</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={criteria.minRangePercent}
-            onChange={(e) => update({ minRangePercent: parseFloat(e.target.value) || 0 })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          />
-        </div>
+          {/* Range % */}
+          <Field label="Range % Min">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.minRangePercent || ""}
+              placeholder="0"
+              onChange={(e) => update({ minRangePercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
+          <Field label="Range % Max">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.maxRangePercent || ""}
+              placeholder="∞"
+              onChange={(e) => update({ maxRangePercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
 
-        {/* Max Range % */}
-        <div>
-          <label className="block text-sm text-[#888] mb-1">Max Range %</label>
-          <input
-            type="number"
-            step="0.1"
-            min="0"
-            value={criteria.maxRangePercent}
-            onChange={(e) => update({ maxRangePercent: parseFloat(e.target.value) || 0 })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-            placeholder="0 = no limit"
-          />
+          {/* Change % */}
+          <Field label="Chg % Min">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.minChangePercent || ""}
+              placeholder="0"
+              onChange={(e) => update({ minChangePercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
+          <Field label="Chg % Max">
+            <input
+              type="number" step="0.1" min="0"
+              value={criteria.maxChangePercent || ""}
+              placeholder="∞"
+              onChange={(e) => update({ maxChangePercent: parseFloat(e.target.value) || 0 })}
+            />
+          </Field>
+
+          {/* Date range */}
+          <Field label="From">
+            <input
+              type="date"
+              value={criteria.dateFrom}
+              onChange={(e) => update({ dateFrom: e.target.value })}
+            />
+          </Field>
+          <Field label="To">
+            <input
+              type="date"
+              value={criteria.dateTo}
+              onChange={(e) => update({ dateTo: e.target.value })}
+            />
+          </Field>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Date Range */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm text-[#888] mb-1">From Date</label>
-          <input
-            type="date"
-            value={criteria.dateFrom}
-            onChange={(e) => update({ dateFrom: e.target.value })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          />
-        </div>
-        <div>
-          <label className="block text-sm text-[#888] mb-1">To Date</label>
-          <input
-            type="date"
-            value={criteria.dateTo}
-            onChange={(e) => update({ dateTo: e.target.value })}
-            className="w-full bg-[#0a0a0a] border border-[#2a2a2a] rounded px-3 py-2 text-sm"
-          />
-        </div>
-      </div>
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="block text-[10px] text-[var(--text-dim)] mb-0.5 uppercase tracking-wider">{label}</label>
+      {children}
     </div>
   );
 }

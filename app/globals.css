@@ -1,19 +1,131 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0a0a;
-  --surface: #141414;
-  --surface-hover: #1a1a1a;
-  --border: #2a2a2a;
-  --text: #e5e5e5;
-  --text-muted: #888;
-  --green: #22c55e;
-  --red: #ef4444;
-  --accent: #3b82f6;
+  --bg: #06080d;
+  --surface: #0d1117;
+  --surface-2: #161b22;
+  --surface-hover: #1c2333;
+  --border: #21262d;
+  --border-bright: #30363d;
+  --text: #e6edf3;
+  --text-muted: #7d8590;
+  --text-dim: #484f58;
+  --green: #3fb950;
+  --green-dim: #238636;
+  --red: #f85149;
+  --red-dim: #da3633;
+  --accent: #58a6ff;
+  --accent-dim: #1f6feb;
+  --orange: #d29922;
+  --purple: #bc8cff;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-bright) transparent;
 }
 
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: system-ui, -apple-system, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  overflow: hidden;
+  height: 100vh;
+}
+
+/* Custom scrollbar for Webkit */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: 3px;
+}
+
+/* Filter inputs */
+select, input[type="number"], input[type="date"], input[type="text"], input[type="password"] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  transition: border-color 0.15s;
+  outline: none;
+  width: 100%;
+}
+select:focus, input:focus {
+  border-color: var(--accent-dim);
+}
+
+select option {
+  background: var(--surface);
+}
+
+/* Stat pill badges */
+.stat-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.stat-badge.green {
+  background: color-mix(in srgb, var(--green) 15%, transparent);
+  color: var(--green);
+}
+.stat-badge.red {
+  background: color-mix(in srgb, var(--red) 15%, transparent);
+  color: var(--red);
+}
+.stat-badge.blue {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+.stat-badge.neutral {
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted);
+}
+
+/* Markdown rendering in AI panel */
+.ai-content h2, .ai-content h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  margin-top: 12px;
+  margin-bottom: 4px;
+}
+.ai-content h2:first-child, .ai-content h3:first-child {
+  margin-top: 0;
+}
+.ai-content p {
+  margin: 4px 0;
+  line-height: 1.5;
+}
+.ai-content ul {
+  padding-left: 16px;
+  margin: 4px 0;
+}
+.ai-content li {
+  margin: 2px 0;
+  line-height: 1.5;
+}
+.ai-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Pulse animation for AI loading */
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+.pulse-glow {
+  animation: pulse-glow 1.5s ease-in-out infinite;
 }
