@@ -30,16 +30,16 @@ interface AnalyzeRequest {
     maxLoss: number;
   };
   filterDescription: string;
-  apiKey: string;
 }
 
 export async function POST(request: NextRequest) {
-  const body: AnalyzeRequest = await request.json();
-  const { days, stats, filterDescription, apiKey } = body;
-
+  const apiKey = process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
-    return NextResponse.json({ error: "DeepSeek API key is required" }, { status: 400 });
+    return NextResponse.json({ error: "DEEPSEEK_API_KEY is not configured on the server" }, { status: 500 });
   }
+
+  const body: AnalyzeRequest = await request.json();
+  const { days, stats, filterDescription } = body;
 
   if (days.length === 0) {
     return NextResponse.json({ error: "No days to analyze" }, { status: 400 });

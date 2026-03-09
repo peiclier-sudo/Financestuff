@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { TradingDay, FilterCriteria } from "@/lib/types";
 
 interface Stats {
@@ -19,6 +19,11 @@ interface Props {
   days: TradingDay[];
   stats: Stats | null;
   criteria: FilterCriteria;
+}
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
 }
 
 function buildFilterDescription(c: FilterCriteria): string {
@@ -41,6 +46,16 @@ function buildFilterDescription(c: FilterCriteria): string {
   return parts.length > 0 ? parts.join(", ") : "No filters (all days)";
 }
 
+function buildContext(stats: Stats | null, criteria: FilterCriteria, dayCount: number): string {
+  if (!stats) return "No data loaded.";
+  return `Filter: ${buildFilterDescription(criteria)}
+Matching days: ${stats.count}
+Bullish: ${stats.bullishPct.toFixed(1)}% | Avg change: ${stats.avgChange.toFixed(3)}% | Median: ${stats.medianChange.toFixed(3)}%
+Avg gap: ${stats.avgGap !== null ? stats.avgGap.toFixed(3) + "%" : "N/A"} | Avg range: ${stats.avgRange.toFixed(3)}%
+Close location: ${stats.avgCloseLocation.toFixed(2)} | Max gain: +${stats.maxGain.toFixed(2)}% | Max loss: ${stats.maxLoss.toFixed(2)}%
+Total filtered days available: ${dayCount}`;
+}
+
 function renderMarkdown(text: string): string {
   return text
     .replace(/### (.*)/g, '<h3>$1</h3>')
@@ -53,32 +68,28 @@ function renderMarkdown(text: string): string {
 }
 
 export default function AIAnalysis({ days, stats, criteria }: Props) {
-  const [apiKey, setApiKey] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("deepseek_key") ?? "";
-    }
-    return "";
-  });
   const [analysis, setAnalysis] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [chatLoading, setChatLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages, analysis]);
 
   const analyze = useCallback(async () => {
-    if (!apiKey.trim()) {
-      setError("Enter your DeepSeek API key first");
-      return;
-    }
     if (!stats || days.length === 0) {
       setError("No days to analyze");
       return;
     }
 
-    // Save key
-    localStorage.setItem("deepseek_key", apiKey);
-
     setLoading(true);
     setError(null);
     setAnalysis(null);
+    setChatMessages([]);
 
     try {
       const daySummaries = days.map(d => ({
@@ -104,7 +115,6 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
           days: daySummaries,
           stats,
           filterDescription: buildFilterDescription(criteria),
-          apiKey: apiKey.trim(),
         }),
       });
 
@@ -119,50 +129,89 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [apiKey, days, stats, criteria]);
+  }, [days, stats, criteria]);
+
+  const sendChat = useCallback(async () => {
+    const msg = chatInput.trim();
+    if (!msg || chatLoading) return;
+
+    setChatInput("");
+    const newMessages: ChatMessage[] = [...chatMessages, { role: "user", content: msg }];
+    setChatMessages(newMessages);
+    setChatLoading(true);
+    setError(null);
+
+    // Include the analysis as the first assistant message in history if it exists
+    const history: ChatMessage[] = [];
+    if (analysis) {
+      history.push({ role: "assistant", content: analysis });
+    }
+    history.push(...chatMessages);
+
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: msg,
+          context: buildContext(stats, criteria, days.length),
+          history,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Chat failed");
+      } else {
+        setChatMessages([...newMessages, { role: "assistant", content: data.reply }]);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error");
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatInput, chatMessages, chatLoading, analysis, stats, criteria, days.length]);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendChat();
+    }
+  };
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col">
-      <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between">
+    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+      {/* Header */}
+      <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-[var(--purple)] text-xs">&#9672;</span>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            AI Pattern Analysis
+            AI Analysis
           </h3>
           <span className="text-[10px] text-[var(--text-dim)]">DeepSeek</span>
         </div>
+        <button
+          onClick={analyze}
+          disabled={loading || days.length === 0}
+          className={`px-2.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+            loading
+              ? "bg-[var(--border)] text-[var(--text-dim)]"
+              : "bg-[var(--accent-dim)] text-white hover:bg-[var(--accent)] active:scale-95"
+          }`}
+        >
+          {loading ? (
+            <span className="flex items-center gap-1">
+              <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
+              Analyzing...
+            </span>
+          ) : (
+            `Analyze ${days.length} days`
+          )}
+        </button>
       </div>
 
-      <div className="p-3 space-y-2 flex-1 overflow-y-auto">
-        {/* API Key input */}
-        <div className="flex gap-2">
-          <input
-            type="password"
-            placeholder="DeepSeek API key"
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-            className="flex-1 text-[11px]"
-          />
-          <button
-            onClick={analyze}
-            disabled={loading || days.length === 0}
-            className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-              loading
-                ? "bg-[var(--border)] text-[var(--text-dim)]"
-                : "bg-[var(--accent-dim)] text-white hover:bg-[var(--accent)] active:scale-95"
-            }`}
-          >
-            {loading ? (
-              <span className="flex items-center gap-1.5">
-                <span className="inline-block w-3 h-3 border border-white/30 border-t-white rounded-full animate-spin" />
-                Analyzing...
-              </span>
-            ) : (
-              `Analyze ${days.length} days`
-            )}
-          </button>
-        </div>
-
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {error && (
           <div className="text-[11px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1.5">
             {error}
@@ -170,9 +219,9 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         )}
 
         {loading && !analysis && (
-          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] py-4 justify-center">
+          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] py-6 justify-center">
             <span className="pulse-glow text-[var(--purple)]">&#9672;</span>
-            DeepSeek is analyzing patterns across {days.length} trading days...
+            Analyzing patterns across {days.length} trading days...
           </div>
         )}
 
@@ -183,11 +232,61 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
           />
         )}
 
-        {!analysis && !loading && !error && (
-          <p className="text-[11px] text-[var(--text-dim)] text-center py-3">
-            Apply filters, then click Analyze to have DeepSeek identify patterns in the matching days.
+        {/* Chat messages */}
+        {chatMessages.map((msg, i) => (
+          <div key={i} className={`text-[11px] leading-relaxed ${
+            msg.role === "user"
+              ? "bg-[var(--accent-dim)]/15 rounded-lg px-2.5 py-1.5 text-[var(--text)] ml-6"
+              : "ai-content text-[var(--text-muted)]"
+          }`}>
+            {msg.role === "user" ? (
+              msg.content
+            ) : (
+              <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
+            )}
+          </div>
+        ))}
+
+        {chatLoading && (
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+            <span className="pulse-glow text-[var(--purple)]">&#9672;</span>
+            Thinking...
+          </div>
+        )}
+
+        {!analysis && !loading && !error && chatMessages.length === 0 && (
+          <p className="text-[11px] text-[var(--text-dim)] text-center py-4">
+            Click &quot;Analyze&quot; to get a pattern report, or type a question below to chat with DeepSeek about the filtered data.
           </p>
         )}
+
+        <div ref={chatEndRef} />
+      </div>
+
+      {/* Chat input */}
+      <div className="flex-shrink-0 border-t border-[var(--border)] p-2">
+        <div className="flex gap-1.5">
+          <input
+            type="text"
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask DeepSeek about these patterns..."
+            className="flex-1 text-[11px]"
+            disabled={chatLoading}
+          />
+          <button
+            onClick={sendChat}
+            disabled={chatLoading || !chatInput.trim()}
+            className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+              chatLoading || !chatInput.trim()
+                ? "bg-[var(--border)] text-[var(--text-dim)]"
+                : "bg-[var(--purple)]/20 text-[var(--purple)] hover:bg-[var(--purple)]/30 active:scale-95"
+            }`}
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );
