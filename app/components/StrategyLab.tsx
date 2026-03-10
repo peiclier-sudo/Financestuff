@@ -158,8 +158,13 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         direction: raw.direction || "long",
         entryBar: raw.entryBar ?? 1,
         entryPrice: raw.entryPrice || "open",
+        entryMode: raw.entryMode || "fixed",
+        entryOffset: raw.entryOffset ?? 1,
         stopPoints: raw.stopPoints || 0,
         targetPoints: raw.targetPoints || 0,
+        stopAtr: raw.stopAtr,
+        targetAtr: raw.targetAtr,
+        atrLength: raw.atrLength,
         holdToClose: raw.holdToClose ?? true,
         maxHoldBars: raw.maxHoldBars,
         timestamp: Date.now(),
@@ -402,17 +407,26 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 </div>
                 <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
                   <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
-                  <div><span className="text-[var(--text-muted)]">Entry:</span> bar {aiStrategy.entryBar} ({aiStrategy.entryPrice})</div>
-                  {aiStrategy.stopPoints > 0 && (
-                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopPoints} pts</div>
+                  <div>
+                    <span className="text-[var(--text-muted)]">Entry:</span>{" "}
+                    {aiStrategy.entryMode === "after_pattern"
+                      ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
+                      : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
+                  </div>
+                  {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
+                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
                   )}
-                  {aiStrategy.targetPoints > 0 && (
-                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetPoints} pts</div>
+                  {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
+                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
                   )}
                   <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
                   {aiStrategy.conditions.map((c, i) => (
                     <div key={i} className="pl-2 text-[var(--text-dim)]">
-                      {c.type}{c.barIndex != null ? ` (bar ${c.barIndex})` : ""}{c.value != null ? ` >= ${c.value}` : ""}
+                      <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
+                      {c.search
+                        ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
+                        : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
+                      {c.value != null ? ` [${c.value}]` : ""}
                     </div>
                   ))}
                 </div>
@@ -451,7 +465,7 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                           <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
                           <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
                           <div className="text-[9px] text-[var(--text-dim)]">
-                            {cs.direction} | bar {cs.entryBar} | {cs.conditions.length} rules
+                            {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
                             {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
                             {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
                           </div>
@@ -532,6 +546,9 @@ function ResultsPanel({
           Filter: {result.filterDescription} ({result.totalDays} days)
         </div>
 
+        {/* Equity Curve */}
+        {result.trades.length >= 2 && <EquityCurve trades={result.trades} />}
+
         {showTrades && (
           <div className="max-h-40 overflow-y-auto border-t border-[var(--border)] mt-1">
             <table className="w-full text-[9px]">
@@ -567,6 +584,96 @@ function ResultsPanel({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Equity Curve (cumulative P&L in points) ──
+function EquityCurve({ trades }: { trades: TradeResult[] }) {
+  const W = 280;
+  const H = 80;
+  const PAD_X = 32;
+  const PAD_Y = 8;
+  const plotW = W - PAD_X - 4;
+  const plotH = H - PAD_Y * 2;
+
+  // Build cumulative series
+  const cumulative: number[] = [0];
+  let running = 0;
+  for (const t of trades) {
+    running += t.pnlPoints;
+    cumulative.push(running);
+  }
+
+  const minVal = Math.min(...cumulative);
+  const maxVal = Math.max(...cumulative);
+  const range = maxVal - minVal || 1;
+
+  const toX = (i: number) => PAD_X + (i / (cumulative.length - 1)) * plotW;
+  const toY = (v: number) => PAD_Y + plotH - ((v - minVal) / range) * plotH;
+
+  // Build the line path
+  const linePath = cumulative.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+
+  // Fill area under the curve (gradient from line to bottom)
+  const fillPath = linePath
+    + ` L${toX(cumulative.length - 1).toFixed(1)},${toY(0).toFixed(1)}`
+    + ` L${toX(0).toFixed(1)},${toY(0).toFixed(1)} Z`;
+
+  const finalVal = cumulative[cumulative.length - 1];
+  const isPositive = finalVal >= 0;
+  const lineColor = isPositive ? "var(--green)" : "var(--red)";
+
+  // Axis labels
+  const zeroY = toY(0);
+  const showZeroLine = minVal < 0 && maxVal > 0;
+
+  return (
+    <div className="border-t border-[var(--border)] pt-1 mt-1">
+      <div className="flex items-center justify-between mb-0.5">
+        <span className="text-[8px] text-[var(--text-dim)] uppercase tracking-wide">Equity Curve (pts)</span>
+        <span className={`text-[9px] font-mono font-semibold ${isPositive ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+          {isPositive ? "+" : ""}{finalVal.toFixed(1)}
+        </span>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
+        <defs>
+          <linearGradient id="eqFillGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={lineColor} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+
+        {/* Zero line */}
+        {showZeroLine && (
+          <line
+            x1={PAD_X} y1={zeroY} x2={W - 4} y2={zeroY}
+            stroke="var(--text-dim)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4"
+          />
+        )}
+
+        {/* Fill under curve */}
+        <path d={fillPath} fill="url(#eqFillGrad)" />
+
+        {/* Equity line */}
+        <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+
+        {/* End dot */}
+        <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="2.5" fill={lineColor} />
+
+        {/* Y-axis labels */}
+        <text x={PAD_X - 2} y={PAD_Y + 3} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace">
+          {maxVal >= 0 ? "+" : ""}{maxVal.toFixed(0)}
+        </text>
+        <text x={PAD_X - 2} y={H - PAD_Y + 1} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace">
+          {minVal >= 0 ? "+" : ""}{minVal.toFixed(0)}
+        </text>
+        {showZeroLine && (
+          <text x={PAD_X - 2} y={zeroY + 2} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace" opacity="0.6">
+            0
+          </text>
+        )}
+      </svg>
     </div>
   );
 }
