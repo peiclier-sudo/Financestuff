@@ -229,243 +229,251 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 text-[10px]">
+      <div className="flex-1 flex flex-col min-h-0 p-2 text-[10px]">
         {tab === "preset" ? (
           <>
-            {/* Strategy selector */}
-            <div>
-              <label className="text-[var(--text-dim)] mb-0.5 block">Strategy</label>
-              <select
-                value={selectedStrategy.id}
-                onChange={e => setSelectedStrategy(STRATEGIES.find(s => s.id === e.target.value)!)}
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)]"
-              >
-                {STRATEGIES.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
-              </select>
-              <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
-            </div>
-
-            {/* Params */}
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-              {selectedStrategy.fields.map(field => (
-                <div key={field.key}>
-                  <label className="text-[var(--text-dim)] block mb-0.5">{field.label}</label>
-                  {field.type === "select" ? (
-                    <select
-                      value={String(params[field.key] ?? field.default)}
-                      onChange={e => setParams(p => ({ ...p, [field.key]: e.target.value }))}
-                      className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)]"
-                    >
-                      {field.options!.map(o => (
-                        <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="number"
-                      value={Number(params[field.key] ?? field.default)}
-                      min={field.min}
-                      max={field.max}
-                      step={field.step}
-                      onChange={e => setParams(p => ({ ...p, [field.key]: Number(e.target.value) }))}
-                      className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)] font-mono"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Run button */}
-            <button
-              onClick={handleRun}
-              disabled={running || days.length === 0}
-              className="w-full btn-primary py-1.5"
-            >
-              {running ? "Running..." : "Run Backtest"}
-            </button>
-
-            {/* Results */}
-            {presetActiveResult && (
-              <ResultsPanel
-                result={presetActiveResult}
-                isViewingSaved={!!viewingSaved}
-                showTrades={showTrades}
-                onToggleTrades={() => setShowTrades(t => !t)}
-                onSave={!viewingSaved && result ? handleSave : undefined}
-              />
-            )}
-
-            {/* Saved results */}
-            {savedResults.length > 0 && (
-              <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-                <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="font-semibold text-[var(--text-dim)] text-[9px] uppercase tracking-wide">Saved Results ({savedResults.length})</span>
-                </div>
-                <div className="max-h-36 overflow-y-auto">
-                  {savedResults.map(sr => (
-                    <div
-                      key={sr.timestamp}
-                      className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between ${
-                        viewingSaved?.timestamp === sr.timestamp ? "bg-[var(--accent-dim)]/15" : ""
-                      }`}
-                      onClick={() => { setViewingSaved(sr); setShowTrades(false); }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-[var(--text-muted)] truncate">{sr.strategyLabel}</div>
-                        <div className="text-[9px] text-[var(--text-dim)] truncate">{sr.filterDescription}</div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span className={`font-mono font-semibold ${sr.totalPnlPoints >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-                          {sr.totalPnlPoints >= 0 ? "+" : ""}{sr.totalPnlPoints.toFixed(0)}
-                        </span>
-                        <span className="text-[var(--text-dim)]">{sr.winRate.toFixed(0)}%</span>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDelete(sr.timestamp); }}
-                          className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px]"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
+            {/* Strategy controls - compact, non-scrolling */}
+            <div className="flex-shrink-0 space-y-2 mb-2">
+              <div>
+                <label className="text-[var(--text-dim)] mb-0.5 block">Strategy</label>
+                <select
+                  value={selectedStrategy.id}
+                  onChange={e => setSelectedStrategy(STRATEGIES.find(s => s.id === e.target.value)!)}
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)]"
+                >
+                  {STRATEGIES.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
+                </select>
+                <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
+              </div>
+
+              {/* Params */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                {selectedStrategy.fields.map(field => (
+                  <div key={field.key}>
+                    <label className="text-[var(--text-dim)] block mb-0.5">{field.label}</label>
+                    {field.type === "select" ? (
+                      <select
+                        value={String(params[field.key] ?? field.default)}
+                        onChange={e => setParams(p => ({ ...p, [field.key]: e.target.value }))}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)]"
+                      >
+                        {field.options!.map(o => (
+                          <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        value={Number(params[field.key] ?? field.default)}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        onChange={e => setParams(p => ({ ...p, [field.key]: Number(e.target.value) }))}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)] font-mono"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Run button */}
+              <button
+                onClick={handleRun}
+                disabled={running || days.length === 0}
+                className="w-full btn-primary py-1.5"
+              >
+                {running ? "Running..." : "Run Backtest"}
+              </button>
+
+              {/* Saved results */}
+              {savedResults.length > 0 && (
+                <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
+                  <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                    <span className="font-semibold text-[var(--text-dim)] text-[9px] uppercase tracking-wide">Saved Results ({savedResults.length})</span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto">
+                    {savedResults.map(sr => (
+                      <div
+                        key={sr.timestamp}
+                        className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between ${
+                          viewingSaved?.timestamp === sr.timestamp ? "bg-[var(--accent-dim)]/15" : ""
+                        }`}
+                        onClick={() => { setViewingSaved(sr); setShowTrades(false); }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-[var(--text-muted)] truncate">{sr.strategyLabel}</div>
+                          <div className="text-[9px] text-[var(--text-dim)] truncate">{sr.filterDescription}</div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                          <span className={`font-mono font-semibold ${sr.totalPnlPoints >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                            {sr.totalPnlPoints >= 0 ? "+" : ""}{sr.totalPnlPoints.toFixed(0)}
+                          </span>
+                          <span className="text-[var(--text-dim)]">{sr.winRate.toFixed(0)}%</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(sr.timestamp); }}
+                            className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Results - fills remaining space */}
+            {presetActiveResult && (
+              <div className="flex-1 min-h-0">
+                <ResultsPanel
+                  result={presetActiveResult}
+                  isViewingSaved={!!viewingSaved}
+                  showTrades={showTrades}
+                  onToggleTrades={() => setShowTrades(t => !t)}
+                  onSave={!viewingSaved && result ? handleSave : undefined}
+                />
               </div>
             )}
           </>
         ) : (
           <>
-            {/* AI Backtest input */}
-            <div>
-              <label className="text-[var(--text-dim)] mb-0.5 block">Describe your strategy idea</label>
-              <textarea
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGenerateAndRun();
-                  }
-                }}
-                placeholder="e.g. Go long if the 3rd candle closes bullish with a stop of 50 points..."
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)] resize-none"
-                rows={3}
-                disabled={aiLoading}
-              />
-              <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">
-                DeepSeek converts your idea into rules and backtests it. Enter to run.
-              </p>
+            {/* AI Backtest controls */}
+            <div className="flex-shrink-0 space-y-2 mb-2">
+              <div>
+                <label className="text-[var(--text-dim)] mb-0.5 block">Describe your strategy idea</label>
+                <textarea
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleGenerateAndRun();
+                    }
+                  }}
+                  placeholder="e.g. Go long if the 3rd candle closes bullish with a stop of 50 points..."
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)] resize-none"
+                  rows={2}
+                  disabled={aiLoading}
+                />
+                <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">
+                  DeepSeek converts your idea into rules and backtests it.
+                </p>
+              </div>
+
+              <button
+                onClick={handleGenerateAndRun}
+                disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
+                className="w-full btn-purple py-1.5"
+              >
+                {aiLoading ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                    Generating & running...
+                  </span>
+                ) : (
+                  `Generate & Backtest (${days.length} days)`
+                )}
+              </button>
+
+              {aiError && (
+                <div className="text-[10px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1">
+                  {aiError}
+                </div>
+              )}
+
+              {/* Show generated rules */}
+              {aiStrategy && (
+                <div className="border border-[var(--purple)]/30 rounded bg-[var(--purple)]/5 px-2 py-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[var(--purple)] font-semibold text-[10px]">{aiStrategy.name}</span>
+                    <button
+                      onClick={handleSaveCustom}
+                      className="text-[var(--purple)] hover:underline text-[9px]"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
+                    <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
+                    <div>
+                      <span className="text-[var(--text-muted)]">Entry:</span>{" "}
+                      {aiStrategy.entryMode === "after_pattern"
+                        ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
+                        : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
+                    </div>
+                    {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
+                      <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
+                    )}
+                    {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
+                      <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
+                    )}
+                    <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
+                    {aiStrategy.conditions.map((c, i) => (
+                      <div key={i} className="pl-2 text-[var(--text-dim)]">
+                        <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
+                        {c.search
+                          ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
+                          : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
+                        {c.value != null ? ` [${c.value}]` : ""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Specific Backtests (saved custom strategies) */}
+              {customStrategies.length > 0 && (
+                <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
+                  <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                    <span className="font-semibold text-[var(--purple)] text-[9px] uppercase tracking-wide">
+                      Specific Backtests ({customStrategies.length})
+                    </span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto">
+                    {customStrategies.map(cs => (
+                      <div
+                        key={cs.id}
+                        className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] ${
+                          viewingCustom?.id === cs.id ? "bg-[var(--purple)]/10" : ""
+                        }`}
+                        onClick={() => handleRunSavedCustom(cs)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
+                            <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
+                            <div className="text-[9px] text-[var(--text-dim)]">
+                              {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
+                              {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
+                              {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
+                            </div>
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDeleteCustom(cs.id); }}
+                            className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px] ml-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={handleGenerateAndRun}
-              disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
-              className="w-full btn-purple py-1.5"
-            >
-              {aiLoading ? (
-                <span className="flex items-center justify-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                  Generating & running...
-                </span>
-              ) : (
-                `Generate & Backtest (${days.length} days)`
-              )}
-            </button>
-
-            {aiError && (
-              <div className="text-[10px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1">
-                {aiError}
-              </div>
-            )}
-
-            {/* Show generated rules */}
-            {aiStrategy && (
-              <div className="border border-[var(--purple)]/30 rounded bg-[var(--purple)]/5 px-2 py-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[var(--purple)] font-semibold text-[10px]">{aiStrategy.name}</span>
-                  <button
-                    onClick={handleSaveCustom}
-                    className="text-[var(--purple)] hover:underline text-[9px]"
-                  >
-                    Save
-                  </button>
-                </div>
-                <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
-                  <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
-                  <div>
-                    <span className="text-[var(--text-muted)]">Entry:</span>{" "}
-                    {aiStrategy.entryMode === "after_pattern"
-                      ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
-                      : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
-                  </div>
-                  {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
-                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
-                  )}
-                  {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
-                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
-                  )}
-                  <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
-                  {aiStrategy.conditions.map((c, i) => (
-                    <div key={i} className="pl-2 text-[var(--text-dim)]">
-                      <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
-                      {c.search
-                        ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
-                        : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
-                      {c.value != null ? ` [${c.value}]` : ""}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* AI results */}
+            {/* AI results - fills remaining space */}
             {aiResult && (
-              <ResultsPanel
-                result={aiResult}
-                isViewingSaved={false}
-                showTrades={showAiTrades}
-                onToggleTrades={() => setShowAiTrades(t => !t)}
-              />
-            )}
-
-            {/* Specific Backtests (saved custom strategies) */}
-            {customStrategies.length > 0 && (
-              <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-                <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="font-semibold text-[var(--purple)] text-[9px] uppercase tracking-wide">
-                    Specific Backtests ({customStrategies.length})
-                  </span>
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {customStrategies.map(cs => (
-                    <div
-                      key={cs.id}
-                      className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] ${
-                        viewingCustom?.id === cs.id ? "bg-[var(--purple)]/10" : ""
-                      }`}
-                      onClick={() => handleRunSavedCustom(cs)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
-                          <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
-                          <div className="text-[9px] text-[var(--text-dim)]">
-                            {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
-                            {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
-                            {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
-                          </div>
-                        </div>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteCustom(cs.id); }}
-                          className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px] ml-2"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex-1 min-h-0">
+                <ResultsPanel
+                  result={aiResult}
+                  isViewingSaved={false}
+                  showTrades={showAiTrades}
+                  onToggleTrades={() => setShowAiTrades(t => !t)}
+                />
               </div>
             )}
           </>
@@ -490,7 +498,7 @@ function ResultsPanel({
   onSave?: () => void;
 }) {
   return (
-    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
+    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in h-full">
       <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
         <span className="font-semibold text-[var(--text-secondary)] text-[10px]">
           {isViewingSaved ? "Saved" : "Results"}: {result.strategyLabel}
@@ -505,31 +513,33 @@ function ResultsPanel({
         </div>
       </div>
 
-      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0">
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Trades" value={String(result.totalTrades)} />
-          <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
-          <StatBox label="Avg P&L" value={`${result.avgPnlPoints >= 0 ? "+" : ""}${result.avgPnlPoints.toFixed(1)} pts`} color={result.avgPnlPoints >= 0 ? "g" : "r"} />
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Total P&L" value={`${result.totalPnlPoints >= 0 ? "+" : ""}${result.totalPnlPoints.toFixed(1)}`} color={result.totalPnlPoints >= 0 ? "g" : "r"} />
-          <StatBox label="Profit Factor" value={result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)} color={result.profitFactor >= 1 ? "g" : "r"} />
-          <StatBox label="Median" value={`${result.medianPnlPoints >= 0 ? "+" : ""}${result.medianPnlPoints.toFixed(1)}`} color={result.medianPnlPoints >= 0 ? "g" : "r"} />
-        </div>
-        <div className="grid grid-cols-4 gap-1">
-          <StatBox label="Avg Win" value={`+${result.avgWin.toFixed(1)}`} color="g" />
-          <StatBox label="Avg Loss" value={`-${result.avgLoss.toFixed(1)}`} color="r" />
-          <StatBox label="Max Win" value={`+${result.maxWin.toFixed(1)}`} color="g" />
-          <StatBox label="Max Loss" value={result.maxLoss.toFixed(1)} color="r" />
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Winners" value={String(result.winners)} color="g" />
-          <StatBox label="Losers" value={String(result.losers)} color="r" />
-          <StatBox label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
-        </div>
+      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-shrink-0 space-y-1">
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label="Trades" value={String(result.totalTrades)} />
+            <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
+            <StatBox label="Avg P&L" value={`${result.avgPnlPoints >= 0 ? "+" : ""}${result.avgPnlPoints.toFixed(1)} pts`} color={result.avgPnlPoints >= 0 ? "g" : "r"} />
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label="Total P&L" value={`${result.totalPnlPoints >= 0 ? "+" : ""}${result.totalPnlPoints.toFixed(1)}`} color={result.totalPnlPoints >= 0 ? "g" : "r"} />
+            <StatBox label="Profit Factor" value={result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)} color={result.profitFactor >= 1 ? "g" : "r"} />
+            <StatBox label="Median" value={`${result.medianPnlPoints >= 0 ? "+" : ""}${result.medianPnlPoints.toFixed(1)}`} color={result.medianPnlPoints >= 0 ? "g" : "r"} />
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            <StatBox label="Avg Win" value={`+${result.avgWin.toFixed(1)}`} color="g" />
+            <StatBox label="Avg Loss" value={`-${result.avgLoss.toFixed(1)}`} color="r" />
+            <StatBox label="Max Win" value={`+${result.maxWin.toFixed(1)}`} color="g" />
+            <StatBox label="Max Loss" value={result.maxLoss.toFixed(1)} color="r" />
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label="Winners" value={String(result.winners)} color="g" />
+            <StatBox label="Losers" value={String(result.losers)} color="r" />
+            <StatBox label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
+          </div>
 
-        <div className="text-[9px] text-[var(--text-dim)] pt-1 border-t border-[var(--border)]">
-          Filter: {result.filterDescription} ({result.totalDays} days)
+          <div className="text-[9px] text-[var(--text-dim)] pt-1 border-t border-[var(--border)]">
+            Filter: {result.filterDescription} ({result.totalDays} days)
+          </div>
         </div>
 
         {/* Equity Curve */}
@@ -649,7 +659,7 @@ function EquityCurve({ trades }: { trades: TradeResult[] }) {
           </span>
         </div>
       </div>
-      <div className="flex-1 min-h-[140px]">
+      <div className="flex-1 min-h-0">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
           <defs>
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
