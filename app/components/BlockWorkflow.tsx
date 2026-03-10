@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { TradingDay } from "@/lib/types";
 import { StrategyResult, TradeResult } from "@/lib/strategies";
 import {
@@ -146,109 +146,225 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
   }, [aiText, aiLoading]);
 
   const stepLabels = ["Entry Signal", "Stop Loss / Exit", "Take Profit", "Management"];
-  const stepIcons = ["1", "2", "3", "4"];
+  const stepColors = ["var(--accent)", "var(--red)", "var(--green)", "var(--purple)"];
+
+  // Block order (drag to reorder)
+  const [blockOrder, setBlockOrder] = useState([0, 1, 2, 3]);
+  // Expanded state per block
+  const [expanded, setExpanded] = useState([true, false, false, false]);
+  // Block heights (null = auto)
+  const [blockHeights, setBlockHeights] = useState<(number | null)[]>([null, null, null, null]);
+
+  // Drag reorder state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
+
+  // Resize state
+  const resizeRef = useRef<{ blockOrderPos: number; startY: number; startH: number } | null>(null);
+  const blockContentRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
+
+  const toggleExpanded = (blockId: number) => {
+    setExpanded(prev => { const n = [...prev]; n[blockId] = !n[blockId]; return n; });
+  };
+
+  // Drag handlers
+  const handleDragStart = (orderPos: number) => { setDragIdx(orderPos); };
+  const handleDragOver = (e: React.DragEvent, orderPos: number) => { e.preventDefault(); setDragOverIdx(orderPos); };
+  const handleDragEnd = () => {
+    if (dragIdx !== null && dragOverIdx !== null && dragIdx !== dragOverIdx) {
+      setBlockOrder(prev => {
+        const next = [...prev];
+        const [item] = next.splice(dragIdx, 1);
+        next.splice(dragOverIdx, 0, item);
+        return next;
+      });
+    }
+    setDragIdx(null);
+    setDragOverIdx(null);
+  };
+
+  // Resize handlers
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!resizeRef.current) return;
+      const { blockOrderPos, startY, startH } = resizeRef.current;
+      const blockId = blockOrder[blockOrderPos];
+      const delta = e.clientY - startY;
+      const newH = Math.max(40, startH + delta);
+      setBlockHeights(prev => { const n = [...prev]; n[blockId] = newH; return n; });
+    };
+    const handleMouseUp = () => { resizeRef.current = null; document.body.style.cursor = ""; document.body.style.userSelect = ""; };
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    return () => { window.removeEventListener("mousemove", handleMouseMove); window.removeEventListener("mouseup", handleMouseUp); };
+  }, [blockOrder]);
+
+  const startResize = (orderPos: number, e: React.MouseEvent) => {
+    e.preventDefault();
+    const blockId = blockOrder[orderPos];
+    const el = blockContentRefs.current[blockId];
+    const currentH = blockHeights[blockId] ?? el?.offsetHeight ?? 100;
+    resizeRef.current = { blockOrderPos: orderPos, startY: e.clientY, startH: currentH };
+    document.body.style.cursor = "ns-resize";
+    document.body.style.userSelect = "none";
+  };
+
+  // Summaries for collapsed view
+  const blockSummary = (blockId: number): string => {
+    switch (blockId) {
+      case 0: return `${ENTRY_LABELS[entry.type]} (${entry.direction})`;
+      case 1: return EXIT_LABELS[exit.type] + (exit.type === "fixed_points" ? ` ${exit.points}pts` : "");
+      case 2: return TP_LABELS[tp.type] + (tp.type === "risk_multiple" ? ` ${tp.riskMultiple}R` : tp.type === "fixed_points" ? ` ${tp.points}pts` : "");
+      case 3: return MGMT_LABELS[mgmt.type];
+      default: return "";
+    }
+  };
+
+  const renderBlockContent = (blockId: number) => {
+    switch (blockId) {
+      case 0: return <EntryForm entry={entry} setEntry={setEntry} />;
+      case 1: return <ExitForm exit={exit} setExit={setExit} />;
+      case 2: return <TakeProfitForm tp={tp} setTp={setTp} hasStop={exit.type !== "none"} />;
+      case 3: return <ManagementForm mgmt={mgmt} setMgmt={setMgmt} />;
+    }
+  };
 
   return (
     <div className="glass-panel overflow-hidden flex flex-col h-full rounded-t-none border-t-0">
-      <div className="flex-1 flex flex-col min-h-0 p-2 text-[10px] overflow-y-auto">
-        {/* Stepper */}
-        <div className="flex items-center gap-1 mb-2 flex-shrink-0">
-          {stepLabels.map((label, i) => (
+      <div className="flex-1 flex flex-col min-h-0 p-1.5 text-[10px] overflow-y-auto gap-1">
+        {/* Blocks */}
+        {blockOrder.map((blockId, orderPos) => {
+          const isExpanded = expanded[blockId];
+          const isDragging = dragIdx === orderPos;
+          const isDragOver = dragOverIdx === orderPos && dragIdx !== null && dragIdx !== orderPos;
+          const color = stepColors[blockId];
+          const isConfirmed = confirmed[blockId];
+
+          return (
             <div
-              key={i}
-              className={`flex-1 flex items-center gap-1 px-1.5 py-1 rounded cursor-pointer transition-all text-[9px] ${
-                activeStep === i
-                  ? "bg-[var(--accent)]/15 border border-[var(--accent)]/40 text-[var(--accent)]"
-                  : confirmed[i]
-                  ? "bg-[var(--green)]/10 border border-[var(--green)]/30 text-[var(--green)]"
-                  : "bg-[var(--bg)] border border-[var(--border)] text-[var(--text-dim)]"
+              key={blockId}
+              className={`rounded border transition-all flex flex-col ${
+                isDragging ? "opacity-40 scale-[0.97]" : ""
+              } ${isDragOver ? "border-[var(--accent)] shadow-[0_0_8px_var(--accent)]/20" : "border-[var(--border)]"} ${
+                isConfirmed ? "bg-[var(--surface)]/60" : "bg-[var(--bg)]"
               }`}
-              onClick={() => confirmed[i] ? editStep(i) : (i <= activeStep ? setActiveStep(i) : null)}
+              draggable
+              onDragStart={() => handleDragStart(orderPos)}
+              onDragOver={e => handleDragOver(e, orderPos)}
+              onDragEnd={handleDragEnd}
             >
-              <span className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 ${
-                confirmed[i] ? "bg-[var(--green)] text-white" : activeStep === i ? "bg-[var(--accent)] text-white" : "bg-[var(--surface-2)] text-[var(--text-dim)]"
-              }`}>
-                {confirmed[i] ? "\u2713" : stepIcons[i]}
-              </span>
-              <span className="truncate font-medium">{label}</span>
-            </div>
-          ))}
-        </div>
-
-        {/* Active block editor */}
-        <div className="flex-shrink-0 space-y-2 mb-2">
-          {/* AI text assist */}
-          <div className="flex gap-1">
-            <input
-              type="text"
-              value={aiText[activeStep]}
-              onChange={e => {
-                const next = [...aiText];
-                next[activeStep] = e.target.value;
-                setAiText(next);
-              }}
-              placeholder={`Describe your ${stepLabels[activeStep].toLowerCase()}...`}
-              className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)]"
-              onKeyDown={e => { if (e.key === "Enter") handleAiAssist(activeStep); }}
-            />
-            <button
-              onClick={() => handleAiAssist(activeStep)}
-              disabled={aiLoading[activeStep] || !aiText[activeStep].trim()}
-              className="px-2 py-1 text-[9px] font-semibold rounded border border-[var(--purple)]/40 text-[var(--purple)] hover:bg-[var(--purple)]/10 disabled:opacity-40"
-            >
-              {aiLoading[activeStep] ? "..." : "AI"}
-            </button>
-          </div>
-
-          {/* Block-specific forms */}
-          {activeStep === 0 && <EntryForm entry={entry} setEntry={setEntry} />}
-          {activeStep === 1 && <ExitForm exit={exit} setExit={setExit} />}
-          {activeStep === 2 && <TakeProfitForm tp={tp} setTp={setTp} hasStop={exit.type !== "none"} />}
-          {activeStep === 3 && <ManagementForm mgmt={mgmt} setMgmt={setMgmt} />}
-
-          {/* Confirm / warning */}
-          {activeStep === 1 && exit.type === "none" && (
-            <div className="text-[9px] text-[var(--yellow,orange)] bg-[var(--yellow,orange)]/10 rounded px-2 py-1 border border-[var(--yellow,orange)]/20">
-              No stop loss — R:R metrics will be unavailable.
-            </div>
-          )}
-          {activeStep === 2 && tp.type === "risk_multiple" && exit.type === "none" && (
-            <div className="text-[9px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1 border border-[var(--red)]/20">
-              Risk multiple requires a stop loss (Block 2).
-            </div>
-          )}
-
-          <button
-            onClick={() => confirmStep(activeStep)}
-            className="w-full btn-primary py-1.5 text-[10px]"
-          >
-            Confirm {stepLabels[activeStep]}
-          </button>
-        </div>
-
-        {/* Run button (when all confirmed) */}
-        {allConfirmed && (
-          <div className="flex-shrink-0 mb-2 space-y-1.5">
-            {/* Summary of all blocks */}
-            <div className="border border-[var(--border)] rounded bg-[var(--bg)] px-2 py-1.5 space-y-0.5 text-[9px]">
-              <div><span className="text-[var(--text-muted)] font-semibold">Entry:</span> <span className="text-[var(--text-dim)]">{ENTRY_LABELS[entry.type]} ({entry.direction})</span></div>
-              <div><span className="text-[var(--text-muted)] font-semibold">Stop:</span> <span className="text-[var(--text-dim)]">{EXIT_LABELS[exit.type]}{exit.type === "fixed_points" ? ` (${exit.points} pts)` : ""}</span></div>
-              <div><span className="text-[var(--text-muted)] font-semibold">Target:</span> <span className="text-[var(--text-dim)]">{TP_LABELS[tp.type]}{tp.type === "fixed_points" ? ` (${tp.points} pts)` : tp.type === "risk_multiple" ? ` (${tp.riskMultiple}R)` : ""}</span></div>
-              <div><span className="text-[var(--text-muted)] font-semibold">Mgmt:</span> <span className="text-[var(--text-dim)]">{MGMT_LABELS[mgmt.type]}</span></div>
-            </div>
-
-            <div className="flex gap-1">
-              <button
-                onClick={handleRun}
-                disabled={running || days.length === 0}
-                className="flex-1 btn-primary py-1.5"
+              {/* Block header — drag handle + title + controls */}
+              <div
+                className="flex items-center gap-1 px-1.5 py-1 cursor-grab active:cursor-grabbing select-none"
+                onClick={() => toggleExpanded(blockId)}
               >
-                {running ? "Running..." : `Run Backtest (${days.length} days)`}
+                {/* Drag grip */}
+                <span className="text-[var(--text-dim)] opacity-40 hover:opacity-80 flex-shrink-0 text-[9px] leading-none" style={{ letterSpacing: "1px" }}>⠿</span>
+                {/* Step badge */}
+                <span
+                  className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 text-white"
+                  style={{ backgroundColor: isConfirmed ? "var(--green)" : color }}
+                >
+                  {isConfirmed ? "\u2713" : blockId + 1}
+                </span>
+                {/* Label */}
+                <span className="text-[9px] font-semibold flex-1 truncate" style={{ color: isExpanded ? color : "var(--text-muted)" }}>
+                  {stepLabels[blockId]}
+                </span>
+                {/* Collapsed summary */}
+                {!isExpanded && (
+                  <span className="text-[8px] text-[var(--text-dim)] truncate max-w-[45%]">{blockSummary(blockId)}</span>
+                )}
+                {/* Confirm button (inline) */}
+                {isExpanded && !isConfirmed && (
+                  <button
+                    onClick={e => { e.stopPropagation(); confirmStep(blockId); }}
+                    className="px-1.5 py-0.5 text-[8px] font-semibold rounded text-white flex-shrink-0"
+                    style={{ backgroundColor: color }}
+                  >
+                    OK
+                  </button>
+                )}
+                {/* Confirmed indicator that allows re-edit */}
+                {isConfirmed && (
+                  <button
+                    onClick={e => { e.stopPropagation(); editStep(blockId); setExpanded(prev => { const n = [...prev]; n[blockId] = true; return n; }); }}
+                    className="text-[8px] text-[var(--green)] hover:underline flex-shrink-0"
+                  >
+                    edit
+                  </button>
+                )}
+                {/* Expand chevron */}
+                <span className={`text-[8px] text-[var(--text-dim)] transition-transform ${isExpanded ? "rotate-180" : ""}`}>▾</span>
+              </div>
+
+              {/* Block content */}
+              {isExpanded && (
+                <div
+                  ref={el => { blockContentRefs.current[blockId] = el; }}
+                  className="px-1.5 pb-1.5 overflow-y-auto space-y-1.5"
+                  style={blockHeights[blockId] != null ? { height: blockHeights[blockId]! } : undefined}
+                >
+                  {/* AI assist */}
+                  <div className="flex gap-1">
+                    <input
+                      type="text"
+                      value={aiText[blockId]}
+                      onChange={e => { const n = [...aiText]; n[blockId] = e.target.value; setAiText(n); }}
+                      placeholder={`Describe ${stepLabels[blockId].toLowerCase()}...`}
+                      className="flex-1 bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)]"
+                      onKeyDown={e => { if (e.key === "Enter") handleAiAssist(blockId); }}
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <button
+                      onClick={e => { e.stopPropagation(); handleAiAssist(blockId); }}
+                      disabled={aiLoading[blockId] || !aiText[blockId].trim()}
+                      className="px-1.5 py-0.5 text-[8px] font-semibold rounded border border-[var(--purple)]/40 text-[var(--purple)] hover:bg-[var(--purple)]/10 disabled:opacity-40"
+                    >
+                      {aiLoading[blockId] ? "..." : "AI"}
+                    </button>
+                  </div>
+
+                  {/* Block form */}
+                  {renderBlockContent(blockId)}
+
+                  {/* Warnings */}
+                  {blockId === 1 && exit.type === "none" && (
+                    <div className="text-[9px] text-[var(--yellow,orange)] bg-[var(--yellow,orange)]/10 rounded px-2 py-1 border border-[var(--yellow,orange)]/20">
+                      No stop — R:R unavailable.
+                    </div>
+                  )}
+                  {blockId === 2 && tp.type === "risk_multiple" && exit.type === "none" && (
+                    <div className="text-[9px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1 border border-[var(--red)]/20">
+                      Risk multiple needs a stop loss.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Resize handle */}
+              {isExpanded && (
+                <div
+                  className="h-1.5 cursor-ns-resize flex items-center justify-center hover:bg-[var(--accent)]/10 transition-colors rounded-b"
+                  onMouseDown={e => startResize(orderPos, e)}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <div className="w-8 h-[2px] rounded-full bg-[var(--border-bright)] opacity-40 hover:opacity-100" />
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* Run section */}
+        {allConfirmed && (
+          <div className="flex-shrink-0 space-y-1">
+            <div className="flex gap-1">
+              <button onClick={handleRun} disabled={running || days.length === 0} className="flex-1 btn-primary py-1.5">
+                {running ? "Running..." : `Run (${days.length} days)`}
               </button>
               {result && (
-                <button onClick={handleSave} className="px-2 py-1.5 text-[9px] border border-[var(--accent)] text-[var(--accent)] rounded hover:bg-[var(--accent)]/10">
-                  Save
-                </button>
+                <button onClick={handleSave} className="px-2 py-1.5 text-[9px] border border-[var(--accent)] text-[var(--accent)] rounded hover:bg-[var(--accent)]/10">Save</button>
               )}
             </div>
           </div>
@@ -256,24 +372,15 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
 
         {/* Saved strategies */}
         {savedStrategies.length > 0 && (
-          <div className="flex-shrink-0 mb-2 border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-            <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
-              <span className="font-semibold text-[var(--text-dim)] text-[9px] uppercase tracking-wide">Saved Strategies ({savedStrategies.length})</span>
+          <div className="flex-shrink-0 border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
+            <div className="px-2 py-0.5 bg-[var(--surface-2)] border-b border-[var(--border)]">
+              <span className="font-semibold text-[var(--text-dim)] text-[8px] uppercase tracking-wide">Saved ({savedStrategies.length})</span>
             </div>
-            <div className="max-h-20 overflow-y-auto">
+            <div className="max-h-16 overflow-y-auto">
               {savedStrategies.map(s => (
-                <div
-                  key={s.id}
-                  className="px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between text-[9px]"
-                  onClick={() => handleLoadSaved(s)}
-                >
+                <div key={s.id} className="px-2 py-0.5 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between text-[9px]" onClick={() => handleLoadSaved(s)}>
                   <span className="text-[var(--text-muted)] truncate flex-1">{s.description || s.name}</span>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleDeleteSaved(s.id); }}
-                    className="text-[var(--red)] opacity-40 hover:opacity-100 ml-2"
-                  >
-                    ✕
-                  </button>
+                  <button onClick={e => { e.stopPropagation(); handleDeleteSaved(s.id); }} className="text-[var(--red)] opacity-40 hover:opacity-100 ml-1">✕</button>
                 </div>
               ))}
             </div>
@@ -283,20 +390,13 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
         {/* Results */}
         {result && (
           <div className="flex-1 min-h-0">
-            <ResultsPanel
-              result={result}
-              showTrades={showTrades}
-              onToggleTrades={() => setShowTrades(t => !t)}
-              onExpand={() => setShowModal(true)}
-            />
+            <ResultsPanel result={result} showTrades={showTrades} onToggleTrades={() => setShowTrades(t => !t)} onExpand={() => setShowModal(true)} />
           </div>
         )}
       </div>
 
-      {/* Modal overlay for expanded results */}
-      {showModal && result && (
-        <ResultsModal result={result} onClose={() => setShowModal(false)} />
-      )}
+      {/* Modal overlay */}
+      {showModal && result && <ResultsModal result={result} onClose={() => setShowModal(false)} />}
     </div>
   );
 }
