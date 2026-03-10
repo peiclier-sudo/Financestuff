@@ -10,6 +10,8 @@ export interface TradeHighlight {
   entryTime: number;
   exitPrice: number;
   exitTime: number;
+  stopPrice: number | null;
+  targetPrice: number | null;
   pnlPoints: number;
   hitTarget: boolean;
   hitStop: boolean;
@@ -217,6 +219,58 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
         axisLabelColor: tradeColor,
         axisLabelTextColor: "#0d1117",
       });
+
+      // Stop loss line
+      if (trade.stopPrice != null) {
+        const slLine = chart.addSeries(LineSeries, {
+          color: "#f8514960",
+          lineWidth: 1,
+          lineStyle: 3, // dotted
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+          lastValueVisible: false,
+        });
+        slLine.setData([
+          { time: t0, value: trade.stopPrice },
+          { time: tN, value: trade.stopPrice },
+        ]);
+        slLine.createPriceLine({
+          price: trade.stopPrice,
+          color: "#f85149",
+          lineWidth: 1,
+          lineStyle: 3,
+          axisLabelVisible: true,
+          title: "SL",
+          axisLabelColor: "#f85149",
+          axisLabelTextColor: "#0d1117",
+        });
+      }
+
+      // Target price line
+      if (trade.targetPrice != null) {
+        const tpLine = chart.addSeries(LineSeries, {
+          color: "#3fb95060",
+          lineWidth: 1,
+          lineStyle: 3, // dotted
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+          lastValueVisible: false,
+        });
+        tpLine.setData([
+          { time: t0, value: trade.targetPrice },
+          { time: tN, value: trade.targetPrice },
+        ]);
+        tpLine.createPriceLine({
+          price: trade.targetPrice,
+          color: "#3fb950",
+          lineWidth: 1,
+          lineStyle: 3,
+          axisLabelVisible: true,
+          title: "TP",
+          axisLabelColor: "#3fb950",
+          axisLabelTextColor: "#0d1117",
+        });
+      }
 
       // Markers for entry/exit on the candlestick series
       // Find closest bar indices for entry/exit times

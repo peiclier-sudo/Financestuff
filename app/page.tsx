@@ -96,6 +96,8 @@ export default function Home() {
       entryTime: trade.entryTime,
       exitPrice: trade.exitPrice,
       exitTime: trade.exitTime,
+      stopPrice: trade.stopPrice,
+      targetPrice: trade.targetPrice,
       pnlPoints: trade.pnlPoints,
       hitTarget: trade.hitTarget,
       hitStop: trade.hitStop,

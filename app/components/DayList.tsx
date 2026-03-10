@@ -64,7 +64,13 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
                 <tr
                   key={day.date}
                   ref={isPrimary ? selectedRef : undefined}
-                  onClick={(e) => onSelect(day.date, e.ctrlKey || e.metaKey)}
+                  onMouseDown={(e) => {
+                    // Use mousedown instead of click so Ctrl is reliably detected
+                    // before browser intercepts Ctrl+click (context menu in iframe, etc.)
+                    if (e.button !== 0) return; // only left click
+                    e.preventDefault();
+                    onSelect(day.date, e.ctrlKey || e.metaKey);
+                  }}
                   className={`cursor-pointer border-b border-[var(--border)] transition-all duration-100 ${
                     isPrimary
                       ? "bg-[var(--accent-dim)]/15 border-l-2 border-l-[var(--accent)]"
