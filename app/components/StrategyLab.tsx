@@ -805,7 +805,11 @@ function ResultsPanel({
 }
 
 // ── Equity Curve (cumulative P&L in points or R:R) ──
-function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; displayMode?: "pts" | "rr" }) {
+function EquityCurve({ trades, displayMode: parentMode = "pts" }: { trades: TradeResult[]; displayMode?: "pts" | "rr" }) {
+  const canShowR = hasRisk(trades);
+  const [localMode, setLocalMode] = useState<"pts" | "rr">(parentMode);
+  const displayMode = localMode;
+
   const W = 320;
   const H = 200;
   const PAD_X = 36;
@@ -824,6 +828,7 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
     cumulative.push(running);
   }
   const unit = displayMode === "rr" ? "R" : "pts";
+  const decimals = displayMode === "rr" ? 2 : 0;
 
   const minVal = Math.min(...cumulative);
   const maxVal = Math.max(...cumulative);
@@ -849,9 +854,9 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
 
   const midVal = (maxVal + minVal) / 2;
   const gridLines = [
-    { y: toY(maxVal), label: `${maxVal >= 0 ? "+" : ""}${maxVal.toFixed(0)}` },
-    { y: toY(midVal), label: `${midVal >= 0 ? "+" : ""}${midVal.toFixed(0)}` },
-    { y: toY(minVal), label: `${minVal >= 0 ? "+" : ""}${minVal.toFixed(0)}` },
+    { y: toY(maxVal), label: `${maxVal >= 0 ? "+" : ""}${maxVal.toFixed(decimals)}` },
+    { y: toY(midVal), label: `${midVal >= 0 ? "+" : ""}${midVal.toFixed(decimals)}` },
+    { y: toY(minVal), label: `${minVal >= 0 ? "+" : ""}${minVal.toFixed(decimals)}` },
   ];
 
   let peak = 0;
@@ -867,11 +872,27 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-2">
           <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">Equity Curve</span>
-          <span className="text-[9px] text-[var(--text-dim)]">{trades.length} trades</span>
+          {canShowR && (
+            <div className="flex rounded overflow-hidden border border-[var(--border)]">
+              {(["pts", "rr"] as const).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setLocalMode(m)}
+                  className={`px-1.5 py-0 text-[8px] font-semibold transition-all ${
+                    localMode === m
+                      ? "bg-[var(--accent)]/15 text-[var(--accent)]"
+                      : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                  }`}
+                >
+                  {m === "pts" ? "pts" : "R"}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <span className="text-[9px] text-[var(--text-dim)]">
-            MaxDD <span className="font-[JetBrains_Mono,monospace] text-[var(--red)]">-{maxDd.toFixed(0)}</span>
+            MaxDD <span className="font-[JetBrains_Mono,monospace] text-[var(--red)]">-{maxDd.toFixed(decimals)}</span>
           </span>
           <span className={`text-[10px] font-[JetBrains_Mono,monospace] font-bold ${isPositive ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
             {isPositive ? "+" : ""}{finalVal.toFixed(displayMode === "rr" ? 2 : 1)} {unit}
