@@ -27,6 +27,8 @@ export interface TradeResult {
   entryTime: number;
   exitPrice: number;
   exitTime: number;
+  stopPrice: number | null;
+  targetPrice: number | null;
   pnlPoints: number;
   pnlPercent: number;
   holdBars: number;
@@ -142,6 +144,16 @@ function simulateTrade(
     ? exitPrice - entryPrice
     : entryPrice - exitPrice;
 
+  // Compute stop/target price levels
+  let stopPrice: number | null = null;
+  let targetPrice: number | null = null;
+  if (stopPoints > 0) {
+    stopPrice = direction === "long" ? entryPrice - stopPoints : entryPrice + stopPoints;
+  }
+  if (targetPoints > 0) {
+    targetPrice = direction === "long" ? entryPrice + targetPoints : entryPrice - targetPoints;
+  }
+
   return {
     date,
     direction,
@@ -149,6 +161,8 @@ function simulateTrade(
     entryTime: bars[entryIdx].time,
     exitPrice,
     exitTime,
+    stopPrice,
+    targetPrice,
     pnlPoints,
     pnlPercent: (pnlPoints / entryPrice) * 100,
     holdBars: Math.max(holdBars, 1),
