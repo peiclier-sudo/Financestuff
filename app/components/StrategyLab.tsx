@@ -158,6 +158,8 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         direction: raw.direction || "long",
         entryBar: raw.entryBar ?? 1,
         entryPrice: raw.entryPrice || "open",
+        entryMode: raw.entryMode || "fixed",
+        entryOffset: raw.entryOffset ?? 1,
         stopPoints: raw.stopPoints || 0,
         targetPoints: raw.targetPoints || 0,
         holdToClose: raw.holdToClose ?? true,
@@ -402,7 +404,12 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 </div>
                 <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
                   <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
-                  <div><span className="text-[var(--text-muted)]">Entry:</span> bar {aiStrategy.entryBar} ({aiStrategy.entryPrice})</div>
+                  <div>
+                    <span className="text-[var(--text-muted)]">Entry:</span>{" "}
+                    {aiStrategy.entryMode === "after_pattern"
+                      ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
+                      : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
+                  </div>
                   {aiStrategy.stopPoints > 0 && (
                     <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopPoints} pts</div>
                   )}
@@ -412,7 +419,11 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                   <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
                   {aiStrategy.conditions.map((c, i) => (
                     <div key={i} className="pl-2 text-[var(--text-dim)]">
-                      {c.type}{c.barIndex != null ? ` (bar ${c.barIndex})` : ""}{c.value != null ? ` >= ${c.value}` : ""}
+                      <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
+                      {c.search
+                        ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
+                        : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
+                      {c.value != null ? ` [${c.value}]` : ""}
                     </div>
                   ))}
                 </div>
@@ -451,7 +462,7 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                           <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
                           <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
                           <div className="text-[9px] text-[var(--text-dim)]">
-                            {cs.direction} | bar {cs.entryBar} | {cs.conditions.length} rules
+                            {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
                             {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
                             {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
                           </div>
