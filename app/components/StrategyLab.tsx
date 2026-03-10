@@ -162,6 +162,9 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         entryOffset: raw.entryOffset ?? 1,
         stopPoints: raw.stopPoints || 0,
         targetPoints: raw.targetPoints || 0,
+        stopAtr: raw.stopAtr,
+        targetAtr: raw.targetAtr,
+        atrLength: raw.atrLength,
         holdToClose: raw.holdToClose ?? true,
         maxHoldBars: raw.maxHoldBars,
         timestamp: Date.now(),
@@ -410,11 +413,11 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                       ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
                       : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
                   </div>
-                  {aiStrategy.stopPoints > 0 && (
-                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopPoints} pts</div>
+                  {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
+                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
                   )}
-                  {aiStrategy.targetPoints > 0 && (
-                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetPoints} pts</div>
+                  {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
+                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
                   )}
                   <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
                   {aiStrategy.conditions.map((c, i) => (

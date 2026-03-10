@@ -3,7 +3,6 @@ import { TradeResult } from "./strategies";
 
 // ── Custom Strategy Rule Format ──
 
-// Search config: dynamically scan bars for a pattern instead of checking a fixed bar
 export interface SearchConfig {
   fromBar?: number;   // start scanning from this bar (default 0)
   toBar?: number;     // stop scanning at this bar (default 77 = end of day)
@@ -12,81 +11,99 @@ export interface SearchConfig {
 
 export interface ConditionRule {
   type:
-    // ── Fixed-bar conditions (use barIndex) ──
-    | "candle_bullish"        // bar closed green (close > open)
-    | "candle_bearish"        // bar closed red (close < open)
-    | "candle_body_min_pct"   // bar body >= value% of open
-    | "candle_body_max_pct"   // bar body <= value% of open
-    | "gap_up"                // day gaps up
-    | "gap_down"              // day gaps down
-    | "gap_min_pct"           // |gap%| >= value
-    | "price_above_prev_close"// bar close > prev close
-    | "price_below_prev_close"// bar close < prev close
-    | "price_above_open"      // bar close > day open
-    | "price_below_open"      // bar close < day open
-    | "first_n_bars_bullish"  // close of bar N > open of bar 0
-    | "first_n_bars_bearish"  // close of bar N < open of bar 0
-    | "prev_day_bullish"      // previous day was bullish
-    | "prev_day_bearish"      // previous day was bearish
-    | "bar_range_min_pct"     // bar (high-low)/open >= value%
-    | "bar_range_max_pct"     // bar (high-low)/open <= value%
-    | "close_in_upper_half"   // bar close in upper half of bar range
-    | "close_in_lower_half"   // bar close in lower half of bar range
-    // ── Pattern-based conditions (use barIndex OR search) ──
-    | "inside_bar"            // bar high <= prev high AND bar low >= prev low
-    | "outside_bar"           // bar high > prev high AND bar low < prev low (engulfing range)
-    | "wide_bar"              // bar range >= value * avg range of prior 5 bars
-    | "narrow_bar"            // bar range <= value * avg range of prior 5 bars
-    | "doji"                  // body <= value% of total range (default 20%)
-    | "hammer"                // lower wick >= 2x body AND upper wick <= body, bullish bias
-    | "shooting_star"         // upper wick >= 2x body AND lower wick <= body, bearish bias
-    | "engulfing_bullish"     // bullish bar whose body fully engulfs previous bar's body
-    | "engulfing_bearish"     // bearish bar whose body fully engulfs previous bar's body
-    | "pin_bar_bullish"       // long lower wick (>= 60% of range), close in upper 30%
-    | "pin_bar_bearish"       // long upper wick (>= 60% of range), close in lower 30%
-    | "three_bar_bullish"     // 3-bar reversal: down, inside/doji, up (starts at barIndex-2)
-    | "three_bar_bearish"     // 3-bar reversal: up, inside/doji, down (starts at barIndex-2)
-    | "higher_high"           // bar makes a higher high than previous bar
-    | "lower_low"             // bar makes a lower low than previous bar
-    | "higher_close"          // bar closes higher than previous bar
-    | "lower_close"           // bar closes lower than previous bar
-    | "break_above_high"      // bar close > highest high of bars 0..barIndex-1
-    | "break_below_low";      // bar close < lowest low of bars 0..barIndex-1
+    // ── Simple bar conditions ──
+    | "candle_bullish"          // close > open (green)
+    | "candle_bearish"          // close < open (red)
+    | "candle_body_min_pct"     // body >= value% of open
+    | "candle_body_max_pct"     // body <= value% of open
+    | "bar_range_min_pct"       // (high-low)/open >= value%
+    | "bar_range_max_pct"       // (high-low)/open <= value%
+    | "close_in_upper_half"     // close in upper half of bar range
+    | "close_in_lower_half"     // close in lower half of bar range
+    | "price_above_open"        // bar close > day open
+    | "price_below_open"        // bar close < day open
+    | "price_above_prev_close"  // bar close > prev day close
+    | "price_below_prev_close"  // bar close < prev day close
+    | "higher_high"             // high > prev bar high
+    | "lower_low"               // low < prev bar low
+    | "higher_close"            // close > prev bar close
+    | "lower_close"             // close < prev bar close
+    | "break_above_high"        // close > highest high of all prior bars
+    | "break_below_low"         // close < lowest low of all prior bars
+    // ── Classic candle patterns ──
+    | "inside_bar"              // high <= prev high AND low >= prev low
+    | "outside_bar"             // high > prev high AND low < prev low
+    | "wide_bar"                // range >= value× avg of prior 5 bars (default 1.5)
+    | "narrow_bar"              // range <= value× avg of prior 5 bars (default 0.5)
+    | "doji"                    // body <= value% of range (default 20)
+    | "hammer"                  // lower wick >= 2× body, upper wick <= body
+    | "shooting_star"           // upper wick >= 2× body, lower wick <= body
+    | "marubozu_bullish"        // bullish, tiny wicks (each <= value% of range, default 10)
+    | "marubozu_bearish"        // bearish, tiny wicks
+    | "spinning_top"            // body <= 30% of range, both wicks >= 25% of range
+    | "engulfing_bullish"       // bullish body engulfs prev bearish body
+    | "engulfing_bearish"       // bearish body engulfs prev bullish body
+    | "pin_bar_bullish"         // lower wick >= 60% of range, close in upper 30%
+    | "pin_bar_bearish"         // upper wick >= 60% of range, close in lower 30%
+    | "tweezer_top"             // two bars with same high (within 0.01%)
+    | "tweezer_bottom"          // two bars with same low (within 0.01%)
+    // ── Multi-bar patterns ──
+    | "three_bar_bullish"       // bearish, inside/doji, bullish
+    | "three_bar_bearish"       // bullish, inside/doji, bearish
+    | "morning_star"            // bearish, small-body gap-down, bullish closing above midpoint of first
+    | "evening_star"            // bullish, small-body gap-up, bearish closing below midpoint of first
+    | "consecutive_bullish"     // value consecutive green bars ending at bi
+    | "consecutive_bearish"     // value consecutive red bars ending at bi
+    // ── Relative / comparison ──
+    | "body_larger_than_prev"   // current body > prev body
+    | "body_smaller_than_prev"  // current body < prev body
+    // ── Reference level conditions ──
+    | "above_opening_range"     // bar close > high of first value bars (value = N bars, default 6)
+    | "below_opening_range"     // bar close < low of first value bars
+    | "close_above_sma"         // bar close > simple moving avg of last value bars
+    | "close_below_sma"         // bar close < simple moving avg of last value bars
+    // ── Gap conditions ──
+    | "gap_up"                  // day gapped up
+    | "gap_down"                // day gapped down
+    | "gap_min_pct"             // |gap%| >= value
+    | "gap_filled"              // bar close crosses back through prev close (gap fill)
+    // ── Day-level conditions ──
+    | "prev_day_bullish"        // previous day green
+    | "prev_day_bearish"        // previous day red
+    | "first_n_bars_bullish"    // close at barIndex > day open
+    | "first_n_bars_bearish"    // close at barIndex < day open
+    // ── Time-based conditions ──
+    | "time_after"              // bar index >= value (value = bar number, e.g. 6 = after 10:00)
+    | "time_before"             // bar index <= value
+    // ── Consolidation ──
+    | "consolidation";          // last value bars have range <= avg range × 0.5
 
-  barIndex?: number;   // fixed bar reference (0 = first bar of day)
-  value?: number;      // threshold value where applicable
-  search?: SearchConfig; // dynamic search: find Nth occurrence in a range
+  barIndex?: number;
+  value?: number;
+  search?: SearchConfig;
 }
 
 export interface CustomStrategyDef {
   id: string;
   name: string;
-  description: string;       // original natural language prompt
+  description: string;
   conditions: ConditionRule[];
   direction: "long" | "short";
-  entryBar: number;          // fixed bar index (used when entryMode is "fixed")
+  entryBar: number;
   entryPrice: "open" | "close";
-  entryMode?: "fixed" | "after_pattern"; // "after_pattern" = enter relative to last dynamic match
-  entryOffset?: number;      // bars after pattern match to enter (default 1, used with after_pattern)
+  entryMode?: "fixed" | "after_pattern";
+  entryOffset?: number;
   stopPoints: number;
   targetPoints: number;
+  stopAtr?: number;     // dynamic stop: value × ATR of last N bars before entry
+  targetAtr?: number;   // dynamic target: value × ATR
+  atrLength?: number;   // lookback for ATR calculation (default 14)
   holdToClose: boolean;
   maxHoldBars?: number;
   timestamp: number;
 }
 
-// ── Pattern Matchers ──
-// Each returns true if bar at `bi` matches the pattern
-
-function isInsideBar(bars: Bar[], bi: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  return bars[bi].high <= bars[bi - 1].high && bars[bi].low >= bars[bi - 1].low;
-}
-
-function isOutsideBar(bars: Bar[], bi: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  return bars[bi].high > bars[bi - 1].high && bars[bi].low < bars[bi - 1].low;
-}
+// ── Helpers ──
 
 function barRange(bar: Bar): number {
   return bar.high - bar.low;
@@ -106,17 +123,32 @@ function avgRangeOfPrior(bars: Bar[], bi: number, lookback: number): number {
   return count > 0 ? sum / count : barRange(bars[bi]);
 }
 
-function isWideBar(bars: Bar[], bi: number, multiplier: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  const avg = avgRangeOfPrior(bars, bi, 5);
-  return barRange(bars[bi]) >= multiplier * avg;
+function computeATR(bars: Bar[], endIdx: number, length: number): number {
+  let sum = 0;
+  let count = 0;
+  for (let i = Math.max(1, endIdx - length + 1); i <= endIdx; i++) {
+    const tr = Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i - 1].close),
+      Math.abs(bars[i].low - bars[i - 1].close)
+    );
+    sum += tr;
+    count++;
+  }
+  return count > 0 ? sum / count : barRange(bars[endIdx]);
 }
 
-function isNarrowBar(bars: Bar[], bi: number, multiplier: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  const avg = avgRangeOfPrior(bars, bi, 5);
-  return barRange(bars[bi]) <= multiplier * avg;
+function sma(bars: Bar[], endIdx: number, length: number): number {
+  let sum = 0;
+  let count = 0;
+  for (let i = Math.max(0, endIdx - length + 1); i <= endIdx; i++) {
+    sum += bars[i].close;
+    count++;
+  }
+  return count > 0 ? sum / count : bars[endIdx].close;
 }
+
+// ── Pattern Matchers ──
 
 function isDoji(bars: Bar[], bi: number, maxBodyPct: number): boolean {
   if (bi >= bars.length) return false;
@@ -126,85 +158,7 @@ function isDoji(bars: Bar[], bi: number, maxBodyPct: number): boolean {
   return (barBody(bar) / range) * 100 <= maxBodyPct;
 }
 
-function isHammer(bars: Bar[], bi: number): boolean {
-  if (bi >= bars.length) return false;
-  const bar = bars[bi];
-  const body = barBody(bar);
-  const range = barRange(bar);
-  if (range === 0 || body === 0) return false;
-  const lowerWick = Math.min(bar.open, bar.close) - bar.low;
-  const upperWick = bar.high - Math.max(bar.open, bar.close);
-  return lowerWick >= 2 * body && upperWick <= body;
-}
-
-function isShootingStar(bars: Bar[], bi: number): boolean {
-  if (bi >= bars.length) return false;
-  const bar = bars[bi];
-  const body = barBody(bar);
-  const range = barRange(bar);
-  if (range === 0 || body === 0) return false;
-  const upperWick = bar.high - Math.max(bar.open, bar.close);
-  const lowerWick = Math.min(bar.open, bar.close) - bar.low;
-  return upperWick >= 2 * body && lowerWick <= body;
-}
-
-function isEngulfingBullish(bars: Bar[], bi: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  const curr = bars[bi];
-  const prev = bars[bi - 1];
-  if (curr.close <= curr.open) return false; // must be bullish
-  if (prev.close >= prev.open) return false; // prev must be bearish
-  return curr.close > prev.open && curr.open < prev.close;
-}
-
-function isEngulfingBearish(bars: Bar[], bi: number): boolean {
-  if (bi < 1 || bi >= bars.length) return false;
-  const curr = bars[bi];
-  const prev = bars[bi - 1];
-  if (curr.close >= curr.open) return false; // must be bearish
-  if (prev.close <= prev.open) return false; // prev must be bullish
-  return curr.open > prev.close && curr.close < prev.open;
-}
-
-function isPinBarBullish(bars: Bar[], bi: number): boolean {
-  if (bi >= bars.length) return false;
-  const bar = bars[bi];
-  const range = barRange(bar);
-  if (range === 0) return false;
-  const lowerWick = Math.min(bar.open, bar.close) - bar.low;
-  return lowerWick / range >= 0.6 && (bar.close - bar.low) / range >= 0.7;
-}
-
-function isPinBarBearish(bars: Bar[], bi: number): boolean {
-  if (bi >= bars.length) return false;
-  const bar = bars[bi];
-  const range = barRange(bar);
-  if (range === 0) return false;
-  const upperWick = bar.high - Math.max(bar.open, bar.close);
-  return upperWick / range >= 0.6 && (bar.high - bar.close) / range >= 0.7;
-}
-
-function isThreeBarBullish(bars: Bar[], bi: number): boolean {
-  // 3-bar pattern ending at bi: bar[bi-2] bearish, bar[bi-1] inside or doji, bar[bi] bullish
-  if (bi < 2 || bi >= bars.length) return false;
-  const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
-  const b0Bearish = b0.close < b0.open;
-  const b1Inside = (b1.high <= b0.high && b1.low >= b0.low) || isDoji(bars, bi - 1, 30);
-  const b2Bullish = b2.close > b2.open;
-  return b0Bearish && b1Inside && b2Bullish;
-}
-
-function isThreeBarBearish(bars: Bar[], bi: number): boolean {
-  if (bi < 2 || bi >= bars.length) return false;
-  const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
-  const b0Bullish = b0.close > b0.open;
-  const b1Inside = (b1.high <= b0.high && b1.low >= b0.low) || isDoji(bars, bi - 1, 30);
-  const b2Bearish = b2.close < b2.open;
-  return b0Bullish && b1Inside && b2Bearish;
-}
-
 // ── Unified Condition Evaluator ──
-// Returns true/false for a single condition at a specific bar index
 
 function evaluateConditionAtBar(
   cond: ConditionRule,
@@ -215,7 +169,7 @@ function evaluateConditionAtBar(
   const bar = bi >= 0 && bi < bars.length ? bars[bi] : null;
 
   switch (cond.type) {
-    // ── Fixed / simple conditions ──
+    // ── Simple bar conditions ──
     case "candle_bullish":
       return bar != null && bar.close > bar.open;
     case "candle_bearish":
@@ -224,28 +178,6 @@ function evaluateConditionAtBar(
       return bar != null && (barBody(bar) / bar.open) * 100 >= (cond.value ?? 0);
     case "candle_body_max_pct":
       return bar != null && (barBody(bar) / bar.open) * 100 <= (cond.value ?? 0);
-    case "gap_up":
-      return day.gapPercent != null && day.gapPercent > 0;
-    case "gap_down":
-      return day.gapPercent != null && day.gapPercent < 0;
-    case "gap_min_pct":
-      return day.gapPercent != null && Math.abs(day.gapPercent) >= (cond.value ?? 0);
-    case "price_above_prev_close":
-      return bar != null && day.prevClose != null && bar.close > day.prevClose;
-    case "price_below_prev_close":
-      return bar != null && day.prevClose != null && bar.close < day.prevClose;
-    case "price_above_open":
-      return bar != null && bar.close > bars[0].open;
-    case "price_below_open":
-      return bar != null && bar.close < bars[0].open;
-    case "first_n_bars_bullish":
-      return bi < bars.length && bars[bi].close > bars[0].open;
-    case "first_n_bars_bearish":
-      return bi < bars.length && bars[bi].close < bars[0].open;
-    case "prev_day_bullish":
-      return day.prevDayDirection === "bullish";
-    case "prev_day_bearish":
-      return day.prevDayDirection === "bearish";
     case "bar_range_min_pct":
       return bar != null && (barRange(bar) / bar.open) * 100 >= (cond.value ?? 0);
     case "bar_range_max_pct":
@@ -256,42 +188,22 @@ function evaluateConditionAtBar(
     case "close_in_lower_half":
       if (!bar || bar.high === bar.low) return false;
       return (bar.close - bar.low) / (bar.high - bar.low) < 0.5;
-
-    // ── Pattern conditions ──
-    case "inside_bar":
-      return isInsideBar(bars, bi);
-    case "outside_bar":
-      return isOutsideBar(bars, bi);
-    case "wide_bar":
-      return isWideBar(bars, bi, cond.value ?? 1.5);
-    case "narrow_bar":
-      return isNarrowBar(bars, bi, cond.value ?? 0.5);
-    case "doji":
-      return isDoji(bars, bi, cond.value ?? 20);
-    case "hammer":
-      return isHammer(bars, bi);
-    case "shooting_star":
-      return isShootingStar(bars, bi);
-    case "engulfing_bullish":
-      return isEngulfingBullish(bars, bi);
-    case "engulfing_bearish":
-      return isEngulfingBearish(bars, bi);
-    case "pin_bar_bullish":
-      return isPinBarBullish(bars, bi);
-    case "pin_bar_bearish":
-      return isPinBarBearish(bars, bi);
-    case "three_bar_bullish":
-      return isThreeBarBullish(bars, bi);
-    case "three_bar_bearish":
-      return isThreeBarBearish(bars, bi);
+    case "price_above_open":
+      return bar != null && bar.close > bars[0].open;
+    case "price_below_open":
+      return bar != null && bar.close < bars[0].open;
+    case "price_above_prev_close":
+      return bar != null && day.prevClose != null && bar.close > day.prevClose;
+    case "price_below_prev_close":
+      return bar != null && day.prevClose != null && bar.close < day.prevClose;
     case "higher_high":
-      return bi >= 1 && bar != null && bars[bi].high > bars[bi - 1].high;
+      return bi >= 1 && bar != null && bar.high > bars[bi - 1].high;
     case "lower_low":
-      return bi >= 1 && bar != null && bars[bi].low < bars[bi - 1].low;
+      return bi >= 1 && bar != null && bar.low < bars[bi - 1].low;
     case "higher_close":
-      return bi >= 1 && bar != null && bars[bi].close > bars[bi - 1].close;
+      return bi >= 1 && bar != null && bar.close > bars[bi - 1].close;
     case "lower_close":
-      return bi >= 1 && bar != null && bars[bi].close < bars[bi - 1].close;
+      return bi >= 1 && bar != null && bar.close < bars[bi - 1].close;
     case "break_above_high": {
       if (!bar || bi < 1) return false;
       let maxHigh = -Infinity;
@@ -304,13 +216,249 @@ function evaluateConditionAtBar(
       for (let j = 0; j < bi; j++) minLow = Math.min(minLow, bars[j].low);
       return bar.close < minLow;
     }
+
+    // ── Classic candle patterns ──
+    case "inside_bar":
+      if (bi < 1 || bi >= bars.length) return false;
+      return bars[bi].high <= bars[bi - 1].high && bars[bi].low >= bars[bi - 1].low;
+    case "outside_bar":
+      if (bi < 1 || bi >= bars.length) return false;
+      return bars[bi].high > bars[bi - 1].high && bars[bi].low < bars[bi - 1].low;
+    case "wide_bar": {
+      if (bi < 1 || bi >= bars.length) return false;
+      const avg = avgRangeOfPrior(bars, bi, 5);
+      return barRange(bars[bi]) >= (cond.value ?? 1.5) * avg;
+    }
+    case "narrow_bar": {
+      if (bi < 1 || bi >= bars.length) return false;
+      const avg = avgRangeOfPrior(bars, bi, 5);
+      return barRange(bars[bi]) <= (cond.value ?? 0.5) * avg;
+    }
+    case "doji":
+      return isDoji(bars, bi, cond.value ?? 20);
+    case "hammer": {
+      if (!bar) return false;
+      const body = barBody(bar);
+      const range = barRange(bar);
+      if (range === 0 || body === 0) return false;
+      const lw = Math.min(bar.open, bar.close) - bar.low;
+      const uw = bar.high - Math.max(bar.open, bar.close);
+      return lw >= 2 * body && uw <= body;
+    }
+    case "shooting_star": {
+      if (!bar) return false;
+      const body = barBody(bar);
+      const range = barRange(bar);
+      if (range === 0 || body === 0) return false;
+      const uw = bar.high - Math.max(bar.open, bar.close);
+      const lw = Math.min(bar.open, bar.close) - bar.low;
+      return uw >= 2 * body && lw <= body;
+    }
+    case "marubozu_bullish": {
+      if (!bar || bar.close <= bar.open) return false;
+      const range = barRange(bar);
+      if (range === 0) return false;
+      const maxWickPct = cond.value ?? 10;
+      const uw = bar.high - bar.close;
+      const lw = bar.open - bar.low;
+      return (uw / range) * 100 <= maxWickPct && (lw / range) * 100 <= maxWickPct;
+    }
+    case "marubozu_bearish": {
+      if (!bar || bar.close >= bar.open) return false;
+      const range = barRange(bar);
+      if (range === 0) return false;
+      const maxWickPct = cond.value ?? 10;
+      const uw = bar.high - bar.open;
+      const lw = bar.close - bar.low;
+      return (uw / range) * 100 <= maxWickPct && (lw / range) * 100 <= maxWickPct;
+    }
+    case "spinning_top": {
+      if (!bar) return false;
+      const range = barRange(bar);
+      if (range === 0) return false;
+      const body = barBody(bar);
+      const uw = bar.high - Math.max(bar.open, bar.close);
+      const lw = Math.min(bar.open, bar.close) - bar.low;
+      return (body / range) <= 0.3 && (uw / range) >= 0.25 && (lw / range) >= 0.25;
+    }
+    case "engulfing_bullish": {
+      if (bi < 1 || bi >= bars.length) return false;
+      const curr = bars[bi], prev = bars[bi - 1];
+      if (curr.close <= curr.open || prev.close >= prev.open) return false;
+      return curr.close > prev.open && curr.open < prev.close;
+    }
+    case "engulfing_bearish": {
+      if (bi < 1 || bi >= bars.length) return false;
+      const curr = bars[bi], prev = bars[bi - 1];
+      if (curr.close >= curr.open || prev.close <= prev.open) return false;
+      return curr.open > prev.close && curr.close < prev.open;
+    }
+    case "pin_bar_bullish": {
+      if (!bar) return false;
+      const range = barRange(bar);
+      if (range === 0) return false;
+      const lw = Math.min(bar.open, bar.close) - bar.low;
+      return lw / range >= 0.6 && (bar.close - bar.low) / range >= 0.7;
+    }
+    case "pin_bar_bearish": {
+      if (!bar) return false;
+      const range = barRange(bar);
+      if (range === 0) return false;
+      const uw = bar.high - Math.max(bar.open, bar.close);
+      return uw / range >= 0.6 && (bar.high - bar.close) / range >= 0.7;
+    }
+    case "tweezer_top": {
+      if (bi < 1 || !bar) return false;
+      const prev = bars[bi - 1];
+      const tolerance = bar.high * 0.0001; // 0.01%
+      return Math.abs(bar.high - prev.high) <= tolerance;
+    }
+    case "tweezer_bottom": {
+      if (bi < 1 || !bar) return false;
+      const prev = bars[bi - 1];
+      const tolerance = bar.low * 0.0001;
+      return Math.abs(bar.low - prev.low) <= tolerance;
+    }
+
+    // ── Multi-bar patterns ──
+    case "three_bar_bullish": {
+      if (bi < 2 || bi >= bars.length) return false;
+      const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
+      return b0.close < b0.open
+        && ((b1.high <= b0.high && b1.low >= b0.low) || isDoji(bars, bi - 1, 30))
+        && b2.close > b2.open;
+    }
+    case "three_bar_bearish": {
+      if (bi < 2 || bi >= bars.length) return false;
+      const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
+      return b0.close > b0.open
+        && ((b1.high <= b0.high && b1.low >= b0.low) || isDoji(bars, bi - 1, 30))
+        && b2.close < b2.open;
+    }
+    case "morning_star": {
+      // bearish candle, small body (gap down or small), bullish candle closing above midpoint of first
+      if (bi < 2 || bi >= bars.length) return false;
+      const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
+      const b0Bearish = b0.close < b0.open;
+      const b1Small = barBody(b1) <= barRange(b1) * 0.35;
+      const b2Bullish = b2.close > b2.open;
+      const b0Mid = (b0.open + b0.close) / 2;
+      return b0Bearish && b1Small && b2Bullish && b2.close > b0Mid;
+    }
+    case "evening_star": {
+      if (bi < 2 || bi >= bars.length) return false;
+      const b0 = bars[bi - 2], b1 = bars[bi - 1], b2 = bars[bi];
+      const b0Bullish = b0.close > b0.open;
+      const b1Small = barBody(b1) <= barRange(b1) * 0.35;
+      const b2Bearish = b2.close < b2.open;
+      const b0Mid = (b0.open + b0.close) / 2;
+      return b0Bullish && b1Small && b2Bearish && b2.close < b0Mid;
+    }
+    case "consecutive_bullish": {
+      const n = cond.value ?? 3;
+      if (bi < n - 1) return false;
+      for (let k = bi - n + 1; k <= bi; k++) {
+        if (k < 0 || k >= bars.length || bars[k].close <= bars[k].open) return false;
+      }
+      return true;
+    }
+    case "consecutive_bearish": {
+      const n = cond.value ?? 3;
+      if (bi < n - 1) return false;
+      for (let k = bi - n + 1; k <= bi; k++) {
+        if (k < 0 || k >= bars.length || bars[k].close >= bars[k].open) return false;
+      }
+      return true;
+    }
+
+    // ── Relative / comparison ──
+    case "body_larger_than_prev":
+      if (bi < 1 || !bar) return false;
+      return barBody(bar) > barBody(bars[bi - 1]);
+    case "body_smaller_than_prev":
+      if (bi < 1 || !bar) return false;
+      return barBody(bar) < barBody(bars[bi - 1]);
+
+    // ── Reference levels ──
+    case "above_opening_range": {
+      if (!bar) return false;
+      const n = cond.value ?? 6;
+      let orHigh = -Infinity;
+      for (let k = 0; k < Math.min(n, bars.length); k++) orHigh = Math.max(orHigh, bars[k].high);
+      return bi >= n && bar.close > orHigh;
+    }
+    case "below_opening_range": {
+      if (!bar) return false;
+      const n = cond.value ?? 6;
+      let orLow = Infinity;
+      for (let k = 0; k < Math.min(n, bars.length); k++) orLow = Math.min(orLow, bars[k].low);
+      return bi >= n && bar.close < orLow;
+    }
+    case "close_above_sma": {
+      if (!bar) return false;
+      const len = cond.value ?? 20;
+      if (bi < len - 1) return false;
+      return bar.close > sma(bars, bi, len);
+    }
+    case "close_below_sma": {
+      if (!bar) return false;
+      const len = cond.value ?? 20;
+      if (bi < len - 1) return false;
+      return bar.close < sma(bars, bi, len);
+    }
+
+    // ── Gap conditions ──
+    case "gap_up":
+      return day.gapPercent != null && day.gapPercent > 0;
+    case "gap_down":
+      return day.gapPercent != null && day.gapPercent < 0;
+    case "gap_min_pct":
+      return day.gapPercent != null && Math.abs(day.gapPercent) >= (cond.value ?? 0);
+    case "gap_filled": {
+      if (!bar || day.prevClose == null) return false;
+      if (day.gapPercent == null || day.gapPercent === 0) return false;
+      // Gap up filled = price dips to or below prev close
+      if (day.gapPercent > 0) return bar.low <= day.prevClose;
+      // Gap down filled = price rises to or above prev close
+      return bar.high >= day.prevClose;
+    }
+
+    // ── Day-level conditions ──
+    case "prev_day_bullish":
+      return day.prevDayDirection === "bullish";
+    case "prev_day_bearish":
+      return day.prevDayDirection === "bearish";
+    case "first_n_bars_bullish":
+      return bi < bars.length && bars[bi].close > bars[0].open;
+    case "first_n_bars_bearish":
+      return bi < bars.length && bars[bi].close < bars[0].open;
+
+    // ── Time-based ──
+    case "time_after":
+      return bi >= (cond.value ?? 0);
+    case "time_before":
+      return bi <= (cond.value ?? 77);
+
+    // ── Consolidation ──
+    case "consolidation": {
+      const n = cond.value ?? 5;
+      if (bi < n - 1 || !bar) return false;
+      let maxH = -Infinity, minL = Infinity;
+      for (let k = bi - n + 1; k <= bi; k++) {
+        maxH = Math.max(maxH, bars[k].high);
+        minL = Math.min(minL, bars[k].low);
+      }
+      const consolidationRange = maxH - minL;
+      const avg = avgRangeOfPrior(bars, bi - n + 1, 10);
+      return consolidationRange <= avg * (n * 0.5);
+    }
+
     default:
       return false;
   }
 }
 
 // ── Search: find the Nth occurrence of a pattern in a bar range ──
-// Returns the bar index where the pattern was found, or -1
 
 function searchForPattern(
   cond: ConditionRule,
@@ -350,7 +498,6 @@ export function runCustomStrategy(
 
     for (const cond of strategy.conditions) {
       if (cond.search) {
-        // Dynamic search: find the pattern in a range
         const foundAt = searchForPattern(cond, day, bars, cond.search);
         if (foundAt < 0) {
           allPass = false;
@@ -358,7 +505,6 @@ export function runCustomStrategy(
         }
         lastPatternBar = Math.max(lastPatternBar, foundAt);
       } else {
-        // Fixed bar check
         const bi = cond.barIndex ?? 0;
         if (!evaluateConditionAtBar(cond, day, bars, bi)) {
           allPass = false;
@@ -372,8 +518,7 @@ export function runCustomStrategy(
     // Determine entry bar
     let ei: number;
     if (strategy.entryMode === "after_pattern" && lastPatternBar >= 0) {
-      const offset = strategy.entryOffset ?? 1;
-      ei = lastPatternBar + offset;
+      ei = lastPatternBar + (strategy.entryOffset ?? 1);
     } else {
       ei = strategy.entryBar;
     }
@@ -382,8 +527,18 @@ export function runCustomStrategy(
 
     const entryPrice = strategy.entryPrice === "open" ? bars[ei].open : bars[ei].close;
     const dir = strategy.direction;
-    const stopPts = strategy.stopPoints;
-    const targetPts = strategy.targetPoints;
+
+    // Compute stop/target — ATR-based or fixed
+    let stopPts = strategy.stopPoints;
+    let targetPts = strategy.targetPoints;
+    if (strategy.stopAtr && strategy.stopAtr > 0) {
+      const atr = computeATR(bars, Math.max(ei - 1, 1), strategy.atrLength ?? 14);
+      stopPts = strategy.stopAtr * atr;
+    }
+    if (strategy.targetAtr && strategy.targetAtr > 0) {
+      const atr = computeATR(bars, Math.max(ei - 1, 1), strategy.atrLength ?? 14);
+      targetPts = strategy.targetAtr * atr;
+    }
 
     // Determine max hold
     let maxHold: number;
@@ -404,40 +559,40 @@ export function runCustomStrategy(
     const maxIdx = Math.min(ei + maxHold, bars.length - 1);
 
     for (let i = ei; i <= maxIdx; i++) {
-      const bar = bars[i];
+      const b = bars[i];
       holdBars = i - ei;
 
       if (dir === "long") {
-        if (stopPts > 0 && bar.low <= entryPrice - stopPts) {
+        if (stopPts > 0 && b.low <= entryPrice - stopPts) {
           exitPrice = entryPrice - stopPts;
-          exitTime = bar.time;
+          exitTime = b.time;
           hitStop = true;
           break;
         }
-        if (targetPts > 0 && bar.high >= entryPrice + targetPts) {
+        if (targetPts > 0 && b.high >= entryPrice + targetPts) {
           exitPrice = entryPrice + targetPts;
-          exitTime = bar.time;
+          exitTime = b.time;
           hitTarget = true;
           break;
         }
       } else {
-        if (stopPts > 0 && bar.high >= entryPrice + stopPts) {
+        if (stopPts > 0 && b.high >= entryPrice + stopPts) {
           exitPrice = entryPrice + stopPts;
-          exitTime = bar.time;
+          exitTime = b.time;
           hitStop = true;
           break;
         }
-        if (targetPts > 0 && bar.low <= entryPrice - targetPts) {
+        if (targetPts > 0 && b.low <= entryPrice - targetPts) {
           exitPrice = entryPrice - targetPts;
-          exitTime = bar.time;
+          exitTime = b.time;
           hitTarget = true;
           break;
         }
       }
 
       if (i === maxIdx) {
-        exitPrice = bar.close;
-        exitTime = bar.time;
+        exitPrice = b.close;
+        exitTime = b.time;
         timedOut = true;
       }
     }
