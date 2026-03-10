@@ -26,6 +26,33 @@ interface ChatMessage {
   content: string;
 }
 
+interface SavedContext {
+  filterDescription: string;
+  analysis: string;
+  timestamp: number;
+}
+
+const CONTEXT_STORAGE_KEY = "deepseek_analysis_history";
+const MAX_SAVED_CONTEXTS = 10;
+
+function loadSavedContexts(): SavedContext[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(CONTEXT_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveContext(filterDescription: string, analysis: string) {
+  const contexts = loadSavedContexts();
+  contexts.unshift({ filterDescription, analysis, timestamp: Date.now() });
+  // Keep only the latest N
+  const trimmed = contexts.slice(0, MAX_SAVED_CONTEXTS);
+  localStorage.setItem(CONTEXT_STORAGE_KEY, JSON.stringify(trimmed));
+}
+
 function buildFilterDescription(c: FilterCriteria): string {
   const parts: string[] = [];
   if (c.dayOfWeek !== null) {
@@ -46,14 +73,25 @@ function buildFilterDescription(c: FilterCriteria): string {
   return parts.length > 0 ? parts.join(", ") : "No filters (all days)";
 }
 
-function buildContext(stats: Stats | null, criteria: FilterCriteria, dayCount: number): string {
+function buildChatContext(stats: Stats | null, criteria: FilterCriteria, dayCount: number): string {
   if (!stats) return "No data loaded.";
-  return `Filter: ${buildFilterDescription(criteria)}
+
+  // Include saved previous analysis contexts for long-term memory
+  const saved = loadSavedContexts();
+  let priorContext = "";
+  if (saved.length > 0) {
+    const recent = saved.slice(0, 5); // Last 5 analyses
+    priorContext = "\n\n--- PRIOR ANALYSIS MEMORY (most recent first) ---\n" +
+      recent.map((s, i) => `[${i + 1}] Filter: ${s.filterDescription}\nKey findings: ${s.analysis.slice(0, 500)}...`).join("\n\n");
+  }
+
+  return `CURRENT SESSION:
+Filter: ${buildFilterDescription(criteria)}
 Matching days: ${stats.count}
 Bullish: ${stats.bullishPct.toFixed(1)}% | Avg change: ${stats.avgChange.toFixed(3)}% | Median: ${stats.medianChange.toFixed(3)}%
 Avg gap: ${stats.avgGap !== null ? stats.avgGap.toFixed(3) + "%" : "N/A"} | Avg range: ${stats.avgRange.toFixed(3)}%
 Close location: ${stats.avgCloseLocation.toFixed(2)} | Max gain: +${stats.maxGain.toFixed(2)}% | Max loss: ${stats.maxLoss.toFixed(2)}%
-Total filtered days available: ${dayCount}`;
+Total filtered days available: ${dayCount}${priorContext}`;
 }
 
 function renderMarkdown(text: string): string {
@@ -102,10 +140,15 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         changePercent: d.changePercent,
         gapPercent: d.gapPercent,
         rangePercent: d.rangePercent,
+        prevClose: d.prevClose,
         prevDayDirection: d.prevDayDirection,
         prevDayChangePercent: d.prevDayChangePercent,
+        prevDayRangePercent: d.prevDayRangePercent,
+        prevDayGapPercent: d.prevDayGapPercent,
         closeLocation: d.closeLocation,
         bodyPercent: d.bodyPercent,
+        upperWickPercent: d.upperWickPercent,
+        lowerWickPercent: d.lowerWickPercent,
       }));
 
       const res = await fetch("/api/analyze", {
@@ -123,6 +166,8 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         setError(data.error ?? "Analysis failed");
       } else {
         setAnalysis(data.analysis);
+        // Save to localStorage for long-term context
+        saveContext(buildFilterDescription(criteria), data.analysis);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error");
@@ -154,7 +199,7 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           message: msg,
-          context: buildContext(stats, criteria, days.length),
+          context: buildChatContext(stats, criteria, days.length),
           history,
         }),
       });
@@ -179,6 +224,8 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
     }
   };
 
+  const savedCount = typeof window !== "undefined" ? loadSavedContexts().length : 0;
+
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
       {/* Header */}
@@ -186,9 +233,14 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         <div className="flex items-center gap-2">
           <span className="text-[var(--purple)] text-xs">&#9672;</span>
           <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
-            AI Analysis
+            AI Deep Analysis
           </h3>
           <span className="text-[10px] text-[var(--text-dim)]">DeepSeek</span>
+          {savedCount > 0 && (
+            <span className="text-[9px] text-[var(--purple)]/60 bg-[var(--purple)]/10 px-1.5 py-0.5 rounded-full">
+              {savedCount} prior {savedCount === 1 ? "analysis" : "analyses"} in memory
+            </span>
+          )}
         </div>
         <button
           onClick={analyze}
@@ -202,7 +254,7 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
           {loading ? (
             <span className="flex items-center gap-1">
               <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
-              Analyzing...
+              Deep analyzing...
             </span>
           ) : (
             `Analyze ${days.length} days`
@@ -219,9 +271,12 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         )}
 
         {loading && !analysis && (
-          <div className="flex items-center gap-2 text-[11px] text-[var(--text-muted)] py-6 justify-center">
+          <div className="flex flex-col items-center gap-2 text-[11px] text-[var(--text-muted)] py-6">
             <span className="pulse-glow text-[var(--purple)]">&#9672;</span>
-            Analyzing patterns across {days.length} trading days...
+            <span>Running deep analysis on {days.length} trading days...</span>
+            <span className="text-[10px] text-[var(--text-dim)]">
+              Computing gap fills, correlations, sequential patterns, candle structure...
+            </span>
           </div>
         )}
 
@@ -256,7 +311,7 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
 
         {!analysis && !loading && !error && chatMessages.length === 0 && (
           <p className="text-[11px] text-[var(--text-dim)] text-center py-4">
-            Click &quot;Analyze&quot; to get a pattern report, or type a question below to chat with DeepSeek about the filtered data.
+            Click &quot;Analyze&quot; for a deep pattern report with gap fills, correlations, sequential patterns &amp; trading thesis — or type a question below.
           </p>
         )}
 
