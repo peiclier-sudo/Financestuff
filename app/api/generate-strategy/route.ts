@@ -4,153 +4,194 @@ interface GenerateRequest {
   prompt: string;
 }
 
-const SYSTEM_PROMPT = `You are a quantitative trading strategy compiler. You convert natural language trading ideas into a structured JSON rule format for backtesting on NASDAQ-100 (NDX) 5-minute intraday data.
+const SYSTEM_PROMPT = `You are a trading strategy compiler. Convert natural language into JSON for backtesting NASDAQ-100 5-min bars.
 
-The trading day has approximately 78 five-minute bars (9:30 AM to 4:00 PM ET).
-- Bar 0 = 9:30-9:35, Bar 1 = 9:35-9:40, Bar 2 = 9:40-9:45, etc.
-- "3rd candle" = barIndex: 2 (0-indexed). "first 30 minutes" = bars 0-5.
-- Bar 5 = 10:00, Bar 11 = 10:30, Bar 23 = 11:30, Bar 35 = 12:30, Bar 47 = 1:30, Bar 59 = 2:30, Bar 71 = 3:30, Bar 77 = last bar.
+Day = 78 bars. Bar 0 = 9:30, Bar 5 = 10:00, Bar 11 = 10:30, Bar 23 = 11:30, Bar 77 = close.
 
-You MUST respond with ONLY a valid JSON object (no markdown, no explanation, no code fences).
-
-SCHEMA:
+OUTPUT FORMAT — JSON only, no explanation:
 {
-  "name": "Short descriptive name",
-  "conditions": [
-    {
-      "type": "<condition_type>",
-      "barIndex": <number>,         // for FIXED bar checks
-      "value": <number or omit>,
-      "search": {                    // for DYNAMIC pattern searching (omit for fixed)
-        "fromBar": <number>,         // start scanning from (default 0)
-        "toBar": <number>,           // stop scanning at (default 77)
-        "occurrence": <number>       // which occurrence (1=first, 2=second, default 1)
-      }
-    }
-  ],
-  "direction": "long" | "short",
-  "entryBar": <number>,             // fixed bar (used with entryMode "fixed")
-  "entryPrice": "open" | "close",
-  "entryMode": "fixed" | "after_pattern",
-  "entryOffset": <number>,          // bars after pattern (default 1, used with after_pattern)
-  "stopPoints": <number, 0 if none>,
-  "targetPoints": <number, 0 if none>,
-  "stopAtr": <number or omit>,      // dynamic stop: value × ATR (e.g. 1.5 = 1.5× ATR)
-  "targetAtr": <number or omit>,    // dynamic target: value × ATR
-  "atrLength": <number or omit>,    // ATR lookback (default 14)
-  "holdToClose": <boolean>,
-  "maxHoldBars": <number or omit>
+  "name": "string",
+  "conditions": [{ "type": "string", "barIndex": N, "value": N, "search": { "fromBar": N, "toBar": N, "occurrence": N } }],
+  "direction": "long"|"short",
+  "entryBar": N,
+  "entryPrice": "open"|"close",
+  "entryMode": "fixed"|"after_pattern",
+  "entryOffset": N,
+  "stopPoints": N,
+  "targetPoints": N,
+  "stopAtr": N,
+  "targetAtr": N,
+  "atrLength": N,
+  "holdToClose": bool,
+  "maxHoldBars": N
 }
 
-Note: stopAtr/targetAtr override stopPoints/targetPoints when set. Use for "stop at 1.5 ATR" type requests.
+TWO MODES:
+1. FIXED: check a specific bar → use "barIndex", set entryMode: "fixed"
+2. DYNAMIC: find a pattern → use "search" (NOT barIndex), set entryMode: "after_pattern", entryOffset: 1
 
-CONDITIONS — Two modes:
+CRITICAL: When the user says "first", "find", or describes a pattern to SEARCH FOR (like "first inside bar", "find a hammer", "after an engulfing"), you MUST use "search" with fromBar/toBar/occurrence. Do NOT use barIndex for dynamic patterns.
 
-A) FIXED BAR (use "barIndex"):
-Check a specific bar by index. Example: { "type": "candle_bullish", "barIndex": 2 }
+EXAMPLES:
 
-B) DYNAMIC SEARCH (use "search"):
-Scan bars to find the Nth occurrence. Example:
-{ "type": "inside_bar", "search": { "fromBar": 1, "toBar": 20, "occurrence": 1 } }
-When using search, omit barIndex. Use entryMode: "after_pattern".
+User: "Go long after the first inside bar of the day"
+{
+  "name": "First Inside Bar Long",
+  "conditions": [{"type": "inside_bar", "search": {"fromBar": 1, "toBar": 77, "occurrence": 1}}],
+  "direction": "long",
+  "entryBar": 0,
+  "entryPrice": "open",
+  "entryMode": "after_pattern",
+  "entryOffset": 1,
+  "stopPoints": 0,
+  "targetPoints": 0,
+  "holdToClose": true
+}
 
-AVAILABLE CONDITIONS (52 total):
+User: "Short after the first shooting star in the first hour, stop 50 pts"
+{
+  "name": "First Hour Shooting Star Short",
+  "conditions": [{"type": "shooting_star", "search": {"fromBar": 1, "toBar": 11, "occurrence": 1}}],
+  "direction": "short",
+  "entryBar": 0,
+  "entryPrice": "open",
+  "entryMode": "after_pattern",
+  "entryOffset": 1,
+  "stopPoints": 50,
+  "targetPoints": 0,
+  "holdToClose": true
+}
 
-Simple bar conditions:
-- "candle_bullish" — green candle (close > open)
-- "candle_bearish" — red candle
-- "candle_body_min_pct" — body >= value% of open
-- "candle_body_max_pct" — body <= value% of open
-- "bar_range_min_pct" — (high-low)/open >= value%
-- "bar_range_max_pct" — (high-low)/open <= value%
-- "close_in_upper_half" — close in upper half of bar range
-- "close_in_lower_half" — close in lower half of bar range
-- "price_above_open" — close > day's opening price
-- "price_below_open" — close < day's opening price
-- "price_above_prev_close" — close > prev day close
-- "price_below_prev_close" — close < prev day close
-- "higher_high" — high > prev bar's high
-- "lower_low" — low < prev bar's low
-- "higher_close" — close > prev bar's close
-- "lower_close" — close < prev bar's close
-- "break_above_high" — close > highest high of ALL prior bars (session breakout)
-- "break_below_low" — close < lowest low of ALL prior bars
+User: "Go long if the 3rd candle closes bullish"
+{
+  "name": "3rd Candle Bullish Long",
+  "conditions": [{"type": "candle_bullish", "barIndex": 2}],
+  "direction": "long",
+  "entryBar": 3,
+  "entryPrice": "open",
+  "entryMode": "fixed",
+  "entryOffset": 1,
+  "stopPoints": 0,
+  "targetPoints": 0,
+  "holdToClose": true
+}
 
-Single-candle patterns:
-- "inside_bar" — high <= prev high AND low >= prev low (contraction)
-- "outside_bar" — high > prev high AND low < prev low (expansion)
-- "wide_bar" — range >= value× avg of prior 5 bars (default 1.5). "big candle" = wide_bar
-- "narrow_bar" — range <= value× avg of prior 5 bars (default 0.5). "small candle" = narrow_bar
-- "doji" — body <= value% of range (default 20)
-- "hammer" — lower wick >= 2× body, tiny upper wick
-- "shooting_star" — upper wick >= 2× body, tiny lower wick
-- "marubozu_bullish" — bullish, both wicks <= value% of range (default 10). Strong momentum green.
-- "marubozu_bearish" — bearish, both wicks <= value% of range. Strong momentum red.
-- "spinning_top" — body <= 30% of range, both wicks >= 25% (indecision)
-- "engulfing_bullish" — bullish body wraps previous bearish body
-- "engulfing_bearish" — bearish body wraps previous bullish body
-- "pin_bar_bullish" — lower wick >= 60% of range, close in upper 30%
-- "pin_bar_bearish" — upper wick >= 60% of range, close in lower 30%
-- "tweezer_top" — two bars with same high (within 0.01%). Bearish reversal signal.
-- "tweezer_bottom" — two bars with same low. Bullish reversal signal.
+User: "Long after first inside bar that is also bullish, with 1.5 ATR stop"
+{
+  "name": "Bullish Inside Bar + ATR Stop",
+  "conditions": [
+    {"type": "inside_bar", "search": {"fromBar": 1, "toBar": 40, "occurrence": 1}},
+    {"type": "candle_bullish", "search": {"fromBar": 1, "toBar": 40, "occurrence": 1}}
+  ],
+  "direction": "long",
+  "entryBar": 0,
+  "entryPrice": "open",
+  "entryMode": "after_pattern",
+  "entryOffset": 1,
+  "stopPoints": 0,
+  "targetPoints": 0,
+  "stopAtr": 1.5,
+  "atrLength": 14,
+  "holdToClose": true
+}
 
-Multi-bar patterns:
-- "three_bar_bullish" — bearish → inside/doji → bullish (reversal up)
-- "three_bar_bearish" — bullish → inside/doji → bearish (reversal down)
-- "morning_star" — bearish → small body → bullish closing above midpoint of first (3-bar bullish reversal)
-- "evening_star" — bullish → small body → bearish closing below midpoint of first (3-bar bearish reversal)
-- "consecutive_bullish" — value consecutive green bars ending at this bar (default 3)
-- "consecutive_bearish" — value consecutive red bars ending at this bar (default 3)
+User: "Long on gap up days after first wide bar breakout"
+{
+  "name": "Gap Up Wide Bar Breakout",
+  "conditions": [
+    {"type": "gap_up"},
+    {"type": "wide_bar", "value": 1.5, "search": {"fromBar": 1, "toBar": 30, "occurrence": 1}},
+    {"type": "candle_bullish", "search": {"fromBar": 1, "toBar": 30, "occurrence": 1}}
+  ],
+  "direction": "long",
+  "entryBar": 0,
+  "entryPrice": "open",
+  "entryMode": "after_pattern",
+  "entryOffset": 1,
+  "stopPoints": 0,
+  "targetPoints": 0,
+  "holdToClose": true
+}
 
-Relative / comparison:
-- "body_larger_than_prev" — body > previous bar's body
-- "body_smaller_than_prev" — body < previous bar's body
+CONDITIONS (use exact type strings):
 
-Reference levels & moving averages:
-- "above_opening_range" — close > high of first value bars (default 6 = 30 min). Opening range breakout up.
-- "below_opening_range" — close < low of first value bars. Opening range breakout down.
-- "close_above_sma" — close > SMA of last value bars (default 20)
-- "close_below_sma" — close < SMA of last value bars
+Bar: candle_bullish, candle_bearish, candle_body_min_pct, candle_body_max_pct, bar_range_min_pct, bar_range_max_pct, close_in_upper_half, close_in_lower_half, price_above_open, price_below_open, price_above_prev_close, price_below_prev_close, higher_high, lower_low, higher_close, lower_close, break_above_high, break_below_low
 
-Gap conditions:
-- "gap_up" — day gapped up
-- "gap_down" — day gapped down
-- "gap_min_pct" — |gap%| >= value
-- "gap_filled" — price crosses back through prev close (gap fill detected at this bar)
+Patterns: inside_bar, outside_bar, wide_bar (value=multiplier, default 1.5), narrow_bar (value=multiplier, default 0.5), doji (value=max body%, default 20), hammer, shooting_star, marubozu_bullish, marubozu_bearish, spinning_top, engulfing_bullish, engulfing_bearish, pin_bar_bullish, pin_bar_bearish, tweezer_top, tweezer_bottom
 
-Day-level:
-- "prev_day_bullish" — previous day green
-- "prev_day_bearish" — previous day red
-- "first_n_bars_bullish" — close at barIndex > day open
-- "first_n_bars_bearish" — close at barIndex < day open
+Multi-bar: three_bar_bullish, three_bar_bearish, morning_star, evening_star, consecutive_bullish (value=count), consecutive_bearish (value=count)
 
-Time-based:
-- "time_after" — bar index >= value (e.g. 6 = after 10:00 AM)
-- "time_before" — bar index <= value (e.g. 23 = before 11:30 AM)
+Comparison: body_larger_than_prev, body_smaller_than_prev
 
-Consolidation:
-- "consolidation" — last value bars form a tight range (range <= 0.5× avg bar × count)
+Levels: above_opening_range (value=N bars, default 6), below_opening_range, close_above_sma (value=period), close_below_sma
 
-RULES:
-1. DYNAMIC: use "search" + entryMode "after_pattern" for "first/second inside bar", "find a hammer", etc.
-2. FIXED: use "barIndex" + entryMode "fixed" for "3rd candle bullish", "bar 5", etc.
-3. Default entry = NEXT bar's open after signal.
-4. For "ATR stop" or "dynamic stop", use stopAtr/targetAtr instead of stopPoints/targetPoints.
-5. If no stop/target specified, use 0 (hold to close).
-6. Translate natural language smartly:
-   - "inside candle/bar" = inside_bar
-   - "wide/big/large candle" = wide_bar
-   - "small/tight candle" = narrow_bar
-   - "no wick candle" / "full body" / "strong momentum bar" = marubozu_bullish or marubozu_bearish
-   - "indecision" = spinning_top or doji
-   - "3 green bars in a row" = consecutive_bullish with value 3
-   - "opening range breakout" = above_opening_range or below_opening_range
-   - "gap fill" = gap_filled
-   - "after 10am" = time_after with value 6
-   - "consolidation then breakout" = consolidation + break_above_high
-   - "above the 20-bar average" = close_above_sma with value 20
-7. For wide_bar/narrow_bar, value is a multiplier (1.5 = 1.5× avg). For doji, value = max body %.
-8. ONLY output JSON. No other text.`;
+Gap: gap_up, gap_down, gap_min_pct (value=%), gap_filled
+
+Day: prev_day_bullish, prev_day_bearish, first_n_bars_bullish, first_n_bars_bearish
+
+Time: time_after (value=bar#), time_before (value=bar#)
+
+Structure: consolidation (value=N bars)
+
+ONLY output JSON.`;
+
+// ── Pattern types that should use dynamic search when no barIndex given ──
+const DYNAMIC_PATTERN_TYPES = new Set([
+  "inside_bar", "outside_bar", "wide_bar", "narrow_bar",
+  "doji", "hammer", "shooting_star", "marubozu_bullish", "marubozu_bearish",
+  "spinning_top", "engulfing_bullish", "engulfing_bearish",
+  "pin_bar_bullish", "pin_bar_bearish", "tweezer_top", "tweezer_bottom",
+  "three_bar_bullish", "three_bar_bearish", "morning_star", "evening_star",
+  "consecutive_bullish", "consecutive_bearish",
+  "body_larger_than_prev", "body_smaller_than_prev",
+  "gap_filled", "above_opening_range", "below_opening_range",
+  "break_above_high", "break_below_low",
+  "consolidation",
+]);
+
+// ── Post-process: fix common DeepSeek mistakes ──
+function fixStrategy(parsed: Record<string, unknown>): Record<string, unknown> {
+  // Fix conditions
+  if (Array.isArray(parsed.conditions)) {
+    let hasSearch = false;
+    parsed.conditions = parsed.conditions.map((cond: Record<string, unknown>) => {
+      // If it's a pattern type with barIndex but no search, and the barIndex
+      // looks like it was meant to be a search (barIndex > 5 or no barIndex at all),
+      // convert to search mode
+      const type = cond.type as string;
+      if (DYNAMIC_PATTERN_TYPES.has(type)) {
+        if (!cond.search && cond.barIndex == null) {
+          // No barIndex and no search — add search defaults
+          cond.search = { fromBar: 1, toBar: 77, occurrence: 1 };
+          delete cond.barIndex;
+          hasSearch = true;
+        } else if (!cond.search && typeof cond.barIndex === "number") {
+          // Has barIndex but it could be intentional (fixed check) — leave it
+          // unless the overall strategy seems dynamic
+        }
+        if (cond.search) hasSearch = true;
+      }
+      return cond;
+    });
+
+    // If any condition uses search but entryMode is still "fixed", fix it
+    if (hasSearch && parsed.entryMode !== "after_pattern") {
+      parsed.entryMode = "after_pattern";
+      if (!parsed.entryOffset) parsed.entryOffset = 1;
+    }
+  }
+
+  // Ensure defaults
+  if (!parsed.entryMode) parsed.entryMode = "fixed";
+  if (!parsed.entryOffset) parsed.entryOffset = 1;
+  if (!parsed.entryBar && parsed.entryBar !== 0) parsed.entryBar = 1;
+  if (!parsed.entryPrice) parsed.entryPrice = "open";
+  if (parsed.stopPoints == null) parsed.stopPoints = 0;
+  if (parsed.targetPoints == null) parsed.targetPoints = 0;
+  if (parsed.holdToClose == null) parsed.holdToClose = true;
+
+  return parsed;
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.DEEPSEEK_API_KEY;
@@ -215,6 +256,9 @@ export async function POST(request: NextRequest) {
         { status: 422 }
       );
     }
+
+    // Auto-fix common mistakes
+    parsed = fixStrategy(parsed);
 
     return NextResponse.json({ strategy: parsed });
   } catch (err) {
