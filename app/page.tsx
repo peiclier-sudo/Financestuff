@@ -36,7 +36,7 @@ export default function Home() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rightTab, setRightTab] = useState<"ai" | "strategy">("strategy");
+  const [rightTab, setRightTab] = useState<"strategies" | "ai_backtest" | "ai_analysis">("strategies");
   const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
 
   useEffect(() => {
@@ -247,27 +247,34 @@ export default function Home() {
         <div className="col-span-3 min-h-0 flex flex-col">
           <div className="flex glass-panel rounded-b-none border-b-0 overflow-hidden flex-shrink-0">
             <button
-              onClick={() => setRightTab("strategy")}
-              className={`tab-btn ${rightTab === "strategy" ? "active" : ""}`}
+              onClick={() => setRightTab("strategies")}
+              className={`tab-btn ${rightTab === "strategies" ? "active" : ""}`}
             >
-              Strategy Lab
+              Strategies
             </button>
             <button
-              onClick={() => setRightTab("ai")}
-              className={`tab-btn ${rightTab === "ai" ? "active" : ""}`}
+              onClick={() => setRightTab("ai_backtest")}
+              className={`tab-btn ${rightTab === "ai_backtest" ? "active-purple" : ""}`}
+            >
+              AI Backtest
+            </button>
+            <button
+              onClick={() => setRightTab("ai_analysis")}
+              className={`tab-btn ${rightTab === "ai_analysis" ? "active" : ""}`}
             >
               AI Analysis
             </button>
           </div>
           <div className="flex-1 min-h-0">
-            {rightTab === "strategy" ? (
+            {rightTab === "ai_analysis" ? (
+              <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
+            ) : (
               <StrategyLab
                 days={filteredDays}
                 filterDescription={buildFilterDescription(criteria)}
                 onResult={handleStrategyResult}
+                mode={rightTab === "ai_backtest" ? "ai" : "preset"}
               />
-            ) : (
-              <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
             )}
           </div>
         </div>

@@ -7,6 +7,7 @@ import {
   StrategyParams,
   StrategyResult,
   TradeResult,
+  ManagementOpts,
   runStrategy,
   loadSavedResults,
   saveResult,
@@ -24,6 +25,7 @@ interface Props {
   days: TradingDay[];
   filterDescription: string;
   onResult?: (result: StrategyResult | null) => void;
+  mode: "preset" | "ai";
 }
 
 // Helper: build a StrategyResult from custom trades
@@ -67,9 +69,7 @@ function buildResult(
   };
 }
 
-export default function StrategyLab({ days, filterDescription, onResult }: Props) {
-  const [tab, setTab] = useState<"preset" | "ai">("preset");
-
+export default function StrategyLab({ days, filterDescription, onResult, mode }: Props) {
   // ── Preset strategy state ──
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyParams>(STRATEGIES[0]);
   const [params, setParams] = useState<Record<string, number | string>>({});
@@ -89,11 +89,20 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
   const [viewingCustom, setViewingCustom] = useState<CustomStrategyDef | null>(null);
   const [showAiTrades, setShowAiTrades] = useState(false);
 
-  // ── Management params ──
+  // ── Shared management params ──
+  const [stopMode, setStopMode] = useState<"fixed" | "candle">("fixed");
   const [trailMode, setTrailMode] = useState<"none" | "candle_hl" | "atr">("none");
   const [trailValue, setTrailValue] = useState(1);
   const [beMode, setBeMode] = useState<"none" | "points" | "atr" | "rr">("none");
   const [beThreshold, setBeThreshold] = useState(0);
+
+  const mgmt: ManagementOpts = {
+    stopMode,
+    trailMode,
+    trailValue,
+    beMode,
+    beThreshold,
+  };
 
   // Init defaults for preset
   useEffect(() => {
@@ -116,11 +125,11 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
     setRunning(true);
     setViewingSaved(null);
     setTimeout(() => {
-      const res = runStrategy(selectedStrategy.id, params, days, filterDescription);
+      const res = runStrategy(selectedStrategy.id, params, days, filterDescription, mgmt);
       setResult(res);
       setRunning(false);
     }, 10);
-  }, [days, selectedStrategy, params, filterDescription]);
+  }, [days, selectedStrategy, params, filterDescription, mgmt]);
 
   const handleSave = useCallback(() => {
     if (!result) return;
@@ -182,7 +191,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
 
       setAiStrategy(stratDef);
 
-      // Run it
       const trades = runCustomStrategy(stratDef, days);
       const stratResult = buildResult(trades, stratDef.name, filterDescription, days.length);
       setAiResult(stratResult);
@@ -191,7 +199,7 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
     } finally {
       setAiLoading(false);
     }
-  }, [aiPrompt, days, filterDescription]);
+  }, [aiPrompt, days, filterDescription, trailMode, trailValue, beMode, beThreshold]);
 
   const handleSaveCustom = useCallback(() => {
     if (!aiStrategy) return;
@@ -201,7 +209,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
 
   const handleRunSavedCustom = useCallback((strat: CustomStrategyDef) => {
     setViewingCustom(strat);
-    // Apply current management params on top of saved strategy
     const withMgmt = {
       ...strat,
       trailMode: trailMode !== "none" ? trailMode : strat.trailMode,
@@ -228,29 +235,27 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
 
   // ── Active result for chart ──
   const presetActiveResult = viewingSaved || result;
-  const activeResult = tab === "preset" ? presetActiveResult : aiResult;
+  const activeResult = mode === "preset" ? presetActiveResult : aiResult;
 
   useEffect(() => {
     onResult?.(activeResult ?? null);
   }, [activeResult, onResult]);
 
+  // ── Management badge ──
+  const mgmtActive = stopMode === "candle" || trailMode !== "none" || beMode !== "none";
+  const mgmtBadge = [
+    stopMode === "candle" && "Candle SL",
+    trailMode !== "none" && "Trail",
+    beMode !== "none" && "BE",
+  ].filter(Boolean).join(" + ");
+
   // ── Render ──
   return (
     <div className="glass-panel overflow-hidden flex flex-col h-full rounded-t-none border-t-0">
-      {/* Tab header */}
-      <div className="flex border-b border-[var(--border)] flex-shrink-0">
-        <button onClick={() => setTab("preset")} className={`tab-btn ${tab === "preset" ? "active" : ""}`}>
-          Strategies
-        </button>
-        <button onClick={() => setTab("ai")} className={`tab-btn ${tab === "ai" ? "active-purple" : ""}`}>
-          AI Backtest
-        </button>
-      </div>
-
       <div className="flex-1 flex flex-col min-h-0 p-2 text-[10px]">
-        {tab === "preset" ? (
+        {mode === "preset" ? (
           <>
-            {/* Strategy controls - compact, non-scrolling */}
+            {/* Strategy controls */}
             <div className="flex-shrink-0 space-y-2 mb-2">
               <div>
                 <label className="text-[var(--text-dim)] mb-0.5 block">Strategy</label>
@@ -266,7 +271,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
               </div>
 
-              {/* Params */}
               <div className="grid grid-cols-2 gap-x-2 gap-y-1">
                 {selectedStrategy.fields.map(field => (
                   <div key={field.key}>
@@ -296,16 +300,24 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 ))}
               </div>
 
-              {/* Run button */}
+              {/* Management */}
+              <ManagementPanel
+                stopMode={stopMode} setStopMode={setStopMode}
+                trailMode={trailMode} setTrailMode={setTrailMode}
+                trailValue={trailValue} setTrailValue={setTrailValue}
+                beMode={beMode} setBeMode={setBeMode}
+                beThreshold={beThreshold} setBeThreshold={setBeThreshold}
+                mgmtActive={mgmtActive} mgmtBadge={mgmtBadge}
+              />
+
               <button
                 onClick={handleRun}
                 disabled={running || days.length === 0}
                 className="w-full btn-primary py-1.5"
               >
-                {running ? "Running..." : "Run Backtest"}
+                {running ? "Running..." : `Run Backtest (${days.length} days)`}
               </button>
 
-              {/* Saved results */}
               {savedResults.length > 0 && (
                 <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
                   <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
@@ -343,7 +355,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
               )}
             </div>
 
-            {/* Results - fills remaining space */}
             {presetActiveResult && (
               <div className="flex-1 min-h-0">
                 <ResultsPanel
@@ -381,6 +392,16 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 </p>
               </div>
 
+              {/* Management */}
+              <ManagementPanel
+                stopMode={stopMode} setStopMode={setStopMode}
+                trailMode={trailMode} setTrailMode={setTrailMode}
+                trailValue={trailValue} setTrailValue={setTrailValue}
+                beMode={beMode} setBeMode={setBeMode}
+                beThreshold={beThreshold} setBeThreshold={setBeThreshold}
+                mgmtActive={mgmtActive} mgmtBadge={mgmtBadge}
+              />
+
               <button
                 onClick={handleGenerateAndRun}
                 disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
@@ -396,90 +417,12 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 )}
               </button>
 
-              {/* Management parameters */}
-              <details className="border border-[var(--border)] rounded bg-[var(--bg)]">
-                <summary className="px-2 py-1 text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide cursor-pointer select-none hover:text-[var(--text)]">
-                  Management
-                  {(trailMode !== "none" || beMode !== "none") && (
-                    <span className="text-[var(--cyan,var(--accent))] ml-1 normal-case tracking-normal">
-                      {[trailMode !== "none" && "Trail", beMode !== "none" && "BE"].filter(Boolean).join(" + ")}
-                    </span>
-                  )}
-                </summary>
-                <div className="px-2 pb-1.5 space-y-1 border-t border-[var(--border)]">
-                  {/* Trail Stop */}
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 pt-1">
-                    <div>
-                      <label className="text-[var(--text-dim)] block text-[9px]">Trail Stop</label>
-                      <select
-                        value={trailMode}
-                        onChange={e => setTrailMode(e.target.value as "none" | "candle_hl" | "atr")}
-                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
-                      >
-                        <option value="none">None</option>
-                        <option value="candle_hl">Candle H/L</option>
-                        <option value="atr">ATR Trail</option>
-                      </select>
-                    </div>
-                    {trailMode !== "none" && (
-                      <div>
-                        <label className="text-[var(--text-dim)] block text-[9px]">
-                          {trailMode === "candle_hl" ? "Lookback bars" : "ATR ×"}
-                        </label>
-                        <input
-                          type="number"
-                          value={trailValue}
-                          min={trailMode === "candle_hl" ? 1 : 0.1}
-                          max={trailMode === "candle_hl" ? 20 : 10}
-                          step={trailMode === "candle_hl" ? 1 : 0.1}
-                          onChange={e => setTrailValue(Number(e.target.value))}
-                          className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
-                        />
-                      </div>
-                    )}
-                  </div>
-                  {/* Break-Even */}
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
-                    <div>
-                      <label className="text-[var(--text-dim)] block text-[9px]">Break-Even</label>
-                      <select
-                        value={beMode}
-                        onChange={e => setBeMode(e.target.value as "none" | "points" | "atr" | "rr")}
-                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
-                      >
-                        <option value="none">None</option>
-                        <option value="points">After X pts</option>
-                        <option value="atr">After X × ATR</option>
-                        <option value="rr">After X R</option>
-                      </select>
-                    </div>
-                    {beMode !== "none" && (
-                      <div>
-                        <label className="text-[var(--text-dim)] block text-[9px]">
-                          {beMode === "points" ? "Points" : beMode === "atr" ? "ATR ×" : "R multiple"}
-                        </label>
-                        <input
-                          type="number"
-                          value={beThreshold}
-                          min={0}
-                          max={beMode === "points" ? 500 : 10}
-                          step={beMode === "points" ? 5 : 0.1}
-                          onChange={e => setBeThreshold(Number(e.target.value))}
-                          className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </details>
-
               {aiError && (
                 <div className="text-[10px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1">
                   {aiError}
                 </div>
               )}
 
-              {/* Show generated rules */}
               {aiStrategy && (
                 <div className="border border-[var(--purple)]/30 rounded bg-[var(--purple)]/5 px-2 py-1.5">
                   <div className="flex items-center justify-between mb-1">
@@ -519,7 +462,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
                 </div>
               )}
 
-              {/* Specific Backtests (saved custom strategies) */}
               {customStrategies.length > 0 && (
                 <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
                   <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
@@ -560,7 +502,6 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
               )}
             </div>
 
-            {/* AI results - fills remaining space */}
             {aiResult && (
               <div className="flex-1 min-h-0">
                 <ResultsPanel
@@ -575,6 +516,129 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         )}
       </div>
     </div>
+  );
+}
+
+// ── Management Panel (shared) ──
+function ManagementPanel({
+  stopMode, setStopMode,
+  trailMode, setTrailMode,
+  trailValue, setTrailValue,
+  beMode, setBeMode,
+  beThreshold, setBeThreshold,
+  mgmtActive, mgmtBadge,
+}: {
+  stopMode: "fixed" | "candle";
+  setStopMode: (v: "fixed" | "candle") => void;
+  trailMode: "none" | "candle_hl" | "atr";
+  setTrailMode: (v: "none" | "candle_hl" | "atr") => void;
+  trailValue: number;
+  setTrailValue: (v: number) => void;
+  beMode: "none" | "points" | "atr" | "rr";
+  setBeMode: (v: "none" | "points" | "atr" | "rr") => void;
+  beThreshold: number;
+  setBeThreshold: (v: number) => void;
+  mgmtActive: boolean;
+  mgmtBadge: string;
+}) {
+  return (
+    <details className="border border-[var(--border)] rounded bg-[var(--bg)]">
+      <summary className="px-2 py-1 text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide cursor-pointer select-none hover:text-[var(--text)] flex items-center gap-1.5">
+        <span>Management</span>
+        {mgmtActive && (
+          <span className="text-[var(--cyan,var(--accent))] normal-case tracking-normal font-normal">
+            {mgmtBadge}
+          </span>
+        )}
+      </summary>
+      <div className="px-2 pb-2 pt-1.5 space-y-1.5 border-t border-[var(--border)]">
+        {/* Stop Loss Mode */}
+        <div>
+          <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Stop Loss Mode</label>
+          <div className="flex gap-1">
+            {(["fixed", "candle"] as const).map(m => (
+              <button
+                key={m}
+                onClick={() => setStopMode(m)}
+                className={`flex-1 py-0.5 rounded text-[9px] border transition-all ${
+                  stopMode === m
+                    ? "border-[var(--accent)] text-[var(--accent)] bg-[var(--accent)]/10"
+                    : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+                }`}
+              >
+                {m === "fixed" ? "Fixed pts" : "Candle N-1"}
+              </button>
+            ))}
+          </div>
+          {stopMode === "candle" && (
+            <p className="text-[8px] text-[var(--text-dim)] mt-0.5">Stop at prev candle low (long) / high (short)</p>
+          )}
+        </div>
+        {/* Trail Stop */}
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+          <div>
+            <label className="text-[var(--text-dim)] block text-[9px]">Trail Stop</label>
+            <select
+              value={trailMode}
+              onChange={e => setTrailMode(e.target.value as "none" | "candle_hl" | "atr")}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
+            >
+              <option value="none">None</option>
+              <option value="candle_hl">Candle H/L</option>
+              <option value="atr">ATR Trail</option>
+            </select>
+          </div>
+          {trailMode !== "none" && (
+            <div>
+              <label className="text-[var(--text-dim)] block text-[9px]">
+                {trailMode === "candle_hl" ? "Lookback bars" : "ATR ×"}
+              </label>
+              <input
+                type="number"
+                value={trailValue}
+                min={trailMode === "candle_hl" ? 1 : 0.1}
+                max={trailMode === "candle_hl" ? 20 : 10}
+                step={trailMode === "candle_hl" ? 1 : 0.1}
+                onChange={e => setTrailValue(Number(e.target.value))}
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
+              />
+            </div>
+          )}
+        </div>
+        {/* Break-Even */}
+        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+          <div>
+            <label className="text-[var(--text-dim)] block text-[9px]">Break-Even</label>
+            <select
+              value={beMode}
+              onChange={e => setBeMode(e.target.value as "none" | "points" | "atr" | "rr")}
+              className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
+            >
+              <option value="none">None</option>
+              <option value="points">After X pts</option>
+              <option value="atr">After X × ATR</option>
+              <option value="rr">After X R</option>
+            </select>
+          </div>
+          {beMode !== "none" && (
+            <div>
+              <label className="text-[var(--text-dim)] block text-[9px]">
+                {beMode === "points" ? "Points" : beMode === "atr" ? "ATR ×" : "R multiple"}
+              </label>
+              <input
+                type="number"
+                value={beThreshold}
+                min={0}
+                max={beMode === "points" ? 500 : 10}
+                step={beMode === "points" ? 5 : 0.1}
+                onChange={e => setBeThreshold(Number(e.target.value))}
+                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -693,7 +757,6 @@ function ResultsPanel({
           </div>
         </div>
 
-        {/* Equity Curve */}
         {result.trades.length >= 2 && <EquityCurve trades={result.trades} displayMode={displayMode} />}
 
         {showTrades && (
@@ -741,7 +804,7 @@ function ResultsPanel({
   );
 }
 
-// ── Equity Curve (cumulative P&L in points or R:R) — expanded to fill remaining space ──
+// ── Equity Curve (cumulative P&L in points or R:R) ──
 function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; displayMode?: "pts" | "rr" }) {
   const W = 320;
   const H = 200;
@@ -751,7 +814,6 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
   const plotW = W - PAD_X - 8;
   const plotH = H - PAD_Y - PAD_BOTTOM;
 
-  // Build cumulative series
   const cumulative: number[] = [0];
   let running = 0;
   for (const t of trades) {
@@ -770,10 +832,8 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
   const toX = (i: number) => PAD_X + (i / (cumulative.length - 1)) * plotW;
   const toY = (v: number) => PAD_Y + plotH - ((v - minVal) / range) * plotH;
 
-  // Build the line path
   const linePath = cumulative.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
 
-  // Fill area: gradient from line down to zero line (or bottom)
   const zeroClampY = Math.min(toY(0), PAD_Y + plotH);
   const fillPath = linePath
     + ` L${toX(cumulative.length - 1).toFixed(1)},${zeroClampY.toFixed(1)}`
@@ -787,7 +847,6 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
   const zeroY = toY(0);
   const showZeroLine = minVal < 0 && maxVal > 0;
 
-  // Compute horizontal grid lines (3 levels)
   const midVal = (maxVal + minVal) / 2;
   const gridLines = [
     { y: toY(maxVal), label: `${maxVal >= 0 ? "+" : ""}${maxVal.toFixed(0)}` },
@@ -795,7 +854,6 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
     { y: toY(minVal), label: `${minVal >= 0 ? "+" : ""}${minVal.toFixed(0)}` },
   ];
 
-  // Drawdown from peak
   let peak = 0;
   let maxDd = 0;
   for (const v of cumulative) {
@@ -830,7 +888,6 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
             </linearGradient>
           </defs>
 
-          {/* Grid lines */}
           {gridLines.map((gl, i) => (
             <g key={i}>
               <line x1={PAD_X} y1={gl.y} x2={W - 8} y2={gl.y}
@@ -842,25 +899,15 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
             </g>
           ))}
 
-          {/* Zero line (bright) */}
           {showZeroLine && (
             <line x1={PAD_X} y1={zeroY} x2={W - 8} y2={zeroY}
               stroke="var(--text-dim)" strokeWidth="0.7" strokeDasharray="4,3" opacity="0.5" />
           )}
 
-          {/* Fill under curve */}
           <path d={fillPath} fill={`url(#${fillId})`} />
-
-          {/* Main equity line */}
           <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-
-          {/* Glow effect on line */}
           <path d={linePath} fill="none" stroke={lineColor} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" opacity="0.1" />
-
-          {/* Start dot */}
           <circle cx={toX(0)} cy={toY(0)} r="2" fill="var(--text-dim)" />
-
-          {/* End dot with glow */}
           <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="5" fill={lineColor} opacity="0.15" />
           <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="3" fill={lineColor} />
           <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="1.5" fill="white" opacity="0.6" />
