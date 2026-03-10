@@ -16,13 +16,14 @@ import AIAnalysis from "./components/AIAnalysis";
 import BlockWorkflow from "./components/BlockWorkflow";
 
 const LAYOUT_KEY = "ndx_panel_layout";
-const ROW_H = 32;
 const COLS = 24;
+const GRID_ROWS = 16;
+const MARGIN = 6;
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: "daylist", x: 0, y: 0, w: 5, h: 16, minW: 3, minH: 6 },
-  { i: "chart", x: 5, y: 0, w: 13, h: 16, minW: 6, minH: 6 },
-  { i: "strategy", x: 18, y: 0, w: 6, h: 16, minW: 4, minH: 6 },
+  { i: "daylist", x: 0, y: 0, w: 5, h: GRID_ROWS, minW: 3, minH: 4 },
+  { i: "chart", x: 5, y: 0, w: 13, h: GRID_ROWS, minW: 6, minH: 4 },
+  { i: "strategy", x: 18, y: 0, w: 6, h: GRID_ROWS, minW: 4, minH: 4 },
 ];
 
 function loadLayout(): LayoutItem[] {
@@ -78,10 +79,29 @@ export default function Home() {
   const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>(() => DEFAULT_LAYOUT.map(l => ({ ...l })));
   const { width: containerWidth, mounted, containerRef: gridContainerRef } = useContainerWidth({ initialWidth: 1400 });
+  const [dynamicRowH, setDynamicRowH] = useState(32);
 
   useEffect(() => {
     setLayout(loadLayout());
   }, []);
+
+  // Compute rowHeight so GRID_ROWS rows fill the container height exactly
+  useEffect(() => {
+    const el = gridContainerRef.current;
+    if (!el) return;
+    const compute = () => {
+      const h = el.offsetHeight;
+      if (h > 0) {
+        // totalHeight = GRID_ROWS * rowH + (GRID_ROWS - 1) * margin
+        const rowH = (h - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
+        setDynamicRowH(Math.max(rowH, 10));
+      }
+    };
+    compute();
+    const ro = new ResizeObserver(compute);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [gridContainerRef]);
 
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -243,7 +263,7 @@ export default function Home() {
           <GridLayout
             layout={layout}
             width={containerWidth}
-            gridConfig={{ cols: COLS, rowHeight: ROW_H, margin: [6, 6], containerPadding: [0, 0] }}
+            gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [0, 0] }}
             dragConfig={{ handle: ".panel-drag-handle" }}
             onLayoutChange={handleLayoutChange}
             compactor={noCompactor}

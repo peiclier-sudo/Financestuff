@@ -6,11 +6,10 @@
   transition: height 200ms ease;
 }
 .react-grid-item {
-  transition: all 200ms ease;
-  transition-property: left, top, width, height;
+  transition: none;
 }
 .react-grid-item.cssTransforms {
-  transition-property: transform, width, height;
+  transition: none;
 }
 .react-grid-item.resizing {
   transition: none;
