@@ -11,7 +11,7 @@ import CandlestickChart, { TradeHighlight } from "./components/CandlestickChart"
 import StatsBar from "./components/StatsBar";
 import DaySummary from "./components/DaySummary";
 import AIAnalysis from "./components/AIAnalysis";
-import StrategyLab from "./components/StrategyLab";
+import BlockWorkflow from "./components/BlockWorkflow";
 
 const DEFAULT_CRITERIA: FilterCriteria = {
   dayOfWeek: null,
@@ -36,7 +36,7 @@ export default function Home() {
   const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [rightTab, setRightTab] = useState<"strategies" | "ai_backtest" | "ai_analysis">("strategies");
+  const [rightTab, setRightTab] = useState<"designer" | "ai_analysis">("designer");
   const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
 
   useEffect(() => {
@@ -247,20 +247,14 @@ export default function Home() {
         <div className="col-span-3 min-h-0 flex flex-col">
           <div className="flex glass-panel rounded-b-none border-b-0 overflow-hidden flex-shrink-0">
             <button
-              onClick={() => setRightTab("strategies")}
-              className={`tab-btn ${rightTab === "strategies" ? "active" : ""}`}
+              onClick={() => setRightTab("designer")}
+              className={`tab-btn ${rightTab === "designer" ? "active" : ""}`}
             >
-              Strategies
-            </button>
-            <button
-              onClick={() => setRightTab("ai_backtest")}
-              className={`tab-btn ${rightTab === "ai_backtest" ? "active-purple" : ""}`}
-            >
-              AI Backtest
+              Strategy Designer
             </button>
             <button
               onClick={() => setRightTab("ai_analysis")}
-              className={`tab-btn ${rightTab === "ai_analysis" ? "active" : ""}`}
+              className={`tab-btn ${rightTab === "ai_analysis" ? "active-purple" : ""}`}
             >
               AI Analysis
             </button>
@@ -269,11 +263,10 @@ export default function Home() {
             {rightTab === "ai_analysis" ? (
               <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
             ) : (
-              <StrategyLab
+              <BlockWorkflow
                 days={filteredDays}
                 filterDescription={buildFilterDescription(criteria)}
                 onResult={handleStrategyResult}
-                mode={rightTab === "ai_backtest" ? "ai" : "preset"}
               />
             )}
           </div>

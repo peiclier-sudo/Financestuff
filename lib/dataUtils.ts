@@ -78,6 +78,8 @@ export function groupIntoDays(bars: Bar[]): TradingDay[] {
       prevDayChangePercent: prevDay ? prevDay.changePercent : null,
       prevDayRangePercent: prevDay ? prevDay.rangePercent : null,
       prevDayGapPercent: prevDay ? prevDay.gapPercent : null,
+      prevDayHigh: prevDay ? prevDay.high : null,
+      prevDayLow: prevDay ? prevDay.low : null,
       bodyPercent,
       upperWickPercent,
       lowerWickPercent,
