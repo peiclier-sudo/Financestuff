@@ -389,7 +389,7 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
 
         {/* Results */}
         {result && (
-          <div className="flex-1 min-h-0">
+          <div className="flex-shrink-0">
             <ResultsPanel result={result} showTrades={showTrades} onToggleTrades={() => setShowTrades(t => !t)} onExpand={() => setShowModal(true)} />
           </div>
         )}
@@ -809,7 +809,7 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
   const fmt = (v: number, prefix = true) => `${prefix && v >= 0 ? "+" : ""}${v.toFixed(displayMode === "rr" ? 2 : 1)}${displayMode === "rr" ? "R" : ""}`;
 
   return (
-    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in h-full">
+    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
       <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
         <span className="font-semibold text-[var(--text-secondary)] text-[10px]">Results</span>
         <div className="flex gap-1 items-center">
@@ -834,8 +834,8 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
         </div>
       </div>
 
-      <div className="p-2 space-y-1 flex-1 flex flex-col min-h-0 overflow-hidden">
-        <div className="flex-shrink-0 space-y-1">
+      <div className="p-2 space-y-1 flex flex-col">
+        <div className="space-y-1">
           <div className="grid grid-cols-3 gap-1">
             <StatBox label="Trades" value={String(result.totalTrades)} />
             <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
@@ -993,7 +993,7 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
   for (const v of cumulative) { if (v > peak) peak = v; const dd = peak - v; if (dd > maxDd) maxDd = dd; }
 
   return (
-    <div className="border-t border-[var(--border)] pt-1 mt-1 flex-1 flex flex-col min-h-0">
+    <div className="border-t border-[var(--border)] pt-1 mt-1 flex flex-col" style={{ minHeight: 140 }}>
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[8px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">Equity</span>
@@ -1012,8 +1012,8 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
           </span>
         </div>
       </div>
-      <div className="flex-1 min-h-0">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+      <div style={{ height: 110 }}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
           <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinejoin="round" />
           <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="3" fill={lineColor} />
         </svg>

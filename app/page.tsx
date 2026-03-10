@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { GridLayout, useContainerWidth, noCompactor } from "react-grid-layout";
 import type { LayoutItem } from "react-grid-layout";
 import { TradingDay, FilterCriteria } from "@/lib/types";
@@ -79,29 +79,29 @@ export default function Home() {
   const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>(() => DEFAULT_LAYOUT.map(l => ({ ...l })));
   const { width: containerWidth, mounted, containerRef: gridContainerRef } = useContainerWidth({ initialWidth: 1400 });
-  const [dynamicRowH, setDynamicRowH] = useState(32);
+  const topBarRef = useRef<HTMLDivElement>(null);
+  const [gridHeight, setGridHeight] = useState(600);
+  const dynamicRowH = (gridHeight - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
 
   useEffect(() => {
     setLayout(loadLayout());
   }, []);
 
-  // Compute rowHeight so GRID_ROWS rows fill the container height exactly
+  // Compute available grid height from viewport minus top bar
   useEffect(() => {
-    const el = gridContainerRef.current;
-    if (!el) return;
     const compute = () => {
-      const h = el.offsetHeight;
-      if (h > 0) {
-        // totalHeight = GRID_ROWS * rowH + (GRID_ROWS - 1) * margin
-        const rowH = (h - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
-        setDynamicRowH(Math.max(rowH, 10));
-      }
+      const topH = topBarRef.current?.offsetHeight ?? 0;
+      // 8px padding (px-2 top + pb-2 bottom of grid container)
+      const available = window.innerHeight - topH - 16;
+      setGridHeight(Math.max(available, 200));
     };
     compute();
+    window.addEventListener("resize", compute);
+    // Also observe top bar in case it changes height
     const ro = new ResizeObserver(compute);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [gridContainerRef]);
+    if (topBarRef.current) ro.observe(topBarRef.current);
+    return () => { window.removeEventListener("resize", compute); ro.disconnect(); };
+  }, []);
 
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -236,7 +236,7 @@ export default function Home() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* ── Top bar ── */}
-      <div className="flex-shrink-0 px-3 pt-2 pb-1 space-y-1.5">
+      <div ref={topBarRef} className="flex-shrink-0 px-3 pt-2 pb-1 space-y-1.5">
         <header className="flex items-center justify-between px-1">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -258,7 +258,7 @@ export default function Home() {
       </div>
 
       {/* ── Grid panels ── */}
-      <div className="flex-1 min-h-0 px-2 pb-2" ref={gridContainerRef}>
+      <div className="px-2 pb-2" ref={gridContainerRef} style={{ height: gridHeight }}>
         {mounted && (
           <GridLayout
             layout={layout}
