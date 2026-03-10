@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 interface ChatRequest {
   message: string;
-  context: string; // stringified stats + filter description
+  context: string; // stats + filter + prior analysis memory
   history: { role: "user" | "assistant"; content: string }[];
 }
 
@@ -22,7 +22,18 @@ export async function POST(request: NextRequest) {
   const messages = [
     {
       role: "system" as const,
-      content: `You are a quantitative trading analyst specialized in NASDAQ-100 (NDX) intraday patterns. You have access to the following context about the user's currently filtered trading day data:\n\n${context}\n\nAnswer the user's questions based on this data. Be concise, data-driven, and precise. Use specific numbers when possible.`,
+      content: `You are an elite quantitative trading analyst specialized in NASDAQ-100 (NDX) intraday patterns. You have deep expertise in gap analysis, candle structure, volatility clustering, and sequential patterns.
+
+You have access to the following context about the user's data and prior analysis sessions:
+
+${context}
+
+INSTRUCTIONS:
+- Answer the user's questions using ALL available context including prior analyses.
+- When referencing prior analyses, note patterns that persist across different filters (these are robust).
+- Be concise, data-driven, and precise. Use specific numbers when possible.
+- If the user asks about something from a prior analysis, reference it by its filter description.
+- You have FULL data access — never say you need more data.`,
     },
     ...history.map(h => ({ role: h.role as "user" | "assistant", content: h.content })),
     { role: "user" as const, content: message },
@@ -39,7 +50,7 @@ export async function POST(request: NextRequest) {
         model: "deepseek-chat",
         messages,
         temperature: 0.4,
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     });
 
