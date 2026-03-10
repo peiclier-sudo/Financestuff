@@ -63,6 +63,16 @@ export interface StrategyResult {
   timestamp: number;
 }
 
+// ── Management options ──
+
+export interface ManagementOpts {
+  stopMode?: "fixed" | "candle";  // "candle" = use prev candle extremity
+  trailMode?: "none" | "candle_hl" | "atr";
+  trailValue?: number;
+  beMode?: "none" | "points" | "atr" | "rr";
+  beThreshold?: number;
+}
+
 // ── Helpers ──
 
 function getBarAtIndex(bars: Bar[], idx: number): Bar | null {
@@ -76,6 +86,21 @@ function medianOf(arr: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
+function computeATR(bars: Bar[], endIdx: number, length: number): number {
+  let sum = 0;
+  let count = 0;
+  for (let i = Math.max(1, endIdx - length + 1); i <= endIdx && i < bars.length; i++) {
+    const tr = Math.max(
+      bars[i].high - bars[i].low,
+      Math.abs(bars[i].high - bars[i - 1].close),
+      Math.abs(bars[i].low - bars[i - 1].close),
+    );
+    sum += tr;
+    count++;
+  }
+  return count > 0 ? sum / count : bars[endIdx].high - bars[endIdx].low;
+}
+
 function simulateTrade(
   bars: Bar[],
   entryIdx: number,
@@ -85,8 +110,24 @@ function simulateTrade(
   targetPoints: number,
   maxHoldBars: number,
   date: string,
+  mgmt?: ManagementOpts,
 ): TradeResult | null {
   if (entryIdx >= bars.length) return null;
+
+  // Resolve initial stop distance
+  let initialStopPts = stopPoints;
+  if (mgmt?.stopMode === "candle" && entryIdx > 0) {
+    const prevBar = bars[entryIdx - 1];
+    initialStopPts = direction === "long"
+      ? Math.max(0, entryPrice - prevBar.low)
+      : Math.max(0, prevBar.high - entryPrice);
+  }
+
+  const trailMode = mgmt?.trailMode ?? "none";
+  const trailValue = mgmt?.trailValue ?? 1;
+  const beMode = mgmt?.beMode ?? "none";
+  const beThreshold = mgmt?.beThreshold ?? 0;
+  const needsMgmt = trailMode !== "none" || beMode !== "none";
 
   let exitPrice = entryPrice;
   let exitTime = bars[entryIdx].time;
@@ -95,21 +136,78 @@ function simulateTrade(
   let timedOut = false;
   let holdBars = 0;
 
+  let currentStopPts = initialStopPts;
+  let beTriggered = false;
+
   const maxIdx = Math.min(entryIdx + maxHoldBars, bars.length - 1);
 
   for (let i = entryIdx; i <= maxIdx; i++) {
     const bar = bars[i];
     holdBars = i - entryIdx;
 
-    if (direction === "long") {
-      // Check stop first (worst case)
-      if (stopPoints > 0 && bar.low <= entryPrice - stopPoints) {
-        exitPrice = entryPrice - stopPoints;
-        exitTime = bar.time;
-        hitStop = true;
-        break;
+    // ── Break-even check ──
+    if (needsMgmt && !beTriggered && beMode !== "none" && initialStopPts > 0 && i > entryIdx) {
+      const unrealised = direction === "long" ? bar.close - entryPrice : entryPrice - bar.close;
+      let beTarget = 0;
+      if (beMode === "points") beTarget = beThreshold;
+      else if (beMode === "atr") beTarget = beThreshold * computeATR(bars, Math.max(entryIdx - 1, 1), 14);
+      else if (beMode === "rr") beTarget = beThreshold * initialStopPts;
+      if (unrealised >= beTarget) {
+        currentStopPts = 0;
+        beTriggered = true;
       }
-      // Check target
+    }
+
+    // ── Trail stop update ──
+    if (needsMgmt && trailMode !== "none" && i > entryIdx) {
+      if (trailMode === "candle_hl") {
+        const lookback = Math.max(1, Math.floor(trailValue));
+        const fromIdx = Math.max(entryIdx, i - lookback);
+        if (direction === "long") {
+          let trailLow = Infinity;
+          for (let k = fromIdx; k <= i; k++) trailLow = Math.min(trailLow, bars[k].low);
+          const trailDist = entryPrice - trailLow;
+          if (trailDist >= 0 && (currentStopPts <= 0 || trailDist < currentStopPts)) currentStopPts = trailDist;
+        } else {
+          let trailHigh = -Infinity;
+          for (let k = fromIdx; k <= i; k++) trailHigh = Math.max(trailHigh, bars[k].high);
+          const trailDist = trailHigh - entryPrice;
+          if (trailDist >= 0 && (currentStopPts <= 0 || trailDist < currentStopPts)) currentStopPts = trailDist;
+        }
+      } else if (trailMode === "atr") {
+        const liveAtr = computeATR(bars, i, 14);
+        const trailDist = trailValue * liveAtr;
+        if (direction === "long") {
+          const trailLevel = bar.close - trailDist;
+          const newDist = entryPrice - trailLevel;
+          if (trailLevel > entryPrice) {
+            currentStopPts = -(trailLevel - entryPrice);
+          } else if (newDist >= 0 && (currentStopPts <= 0 || newDist < currentStopPts)) {
+            currentStopPts = newDist;
+          }
+        } else {
+          const trailLevel = bar.close + trailDist;
+          const newDist = trailLevel - entryPrice;
+          if (trailLevel < entryPrice) {
+            currentStopPts = -(entryPrice - trailLevel);
+          } else if (newDist >= 0 && (currentStopPts <= 0 || newDist < currentStopPts)) {
+            currentStopPts = newDist;
+          }
+        }
+      }
+    }
+
+    // ── Stop check ──
+    if (direction === "long") {
+      if (currentStopPts !== 0) {
+        const stopLevel = entryPrice - currentStopPts;
+        if (bar.low <= stopLevel) {
+          exitPrice = stopLevel;
+          exitTime = bar.time;
+          hitStop = true;
+          break;
+        }
+      }
       if (targetPoints > 0 && bar.high >= entryPrice + targetPoints) {
         exitPrice = entryPrice + targetPoints;
         exitTime = bar.time;
@@ -117,14 +215,15 @@ function simulateTrade(
         break;
       }
     } else {
-      // Short: check stop (price goes up)
-      if (stopPoints > 0 && bar.high >= entryPrice + stopPoints) {
-        exitPrice = entryPrice + stopPoints;
-        exitTime = bar.time;
-        hitStop = true;
-        break;
+      if (currentStopPts !== 0) {
+        const stopLevel = entryPrice + currentStopPts;
+        if (bar.high >= stopLevel) {
+          exitPrice = stopLevel;
+          exitTime = bar.time;
+          hitStop = true;
+          break;
+        }
       }
-      // Check target (price goes down)
       if (targetPoints > 0 && bar.low <= entryPrice - targetPoints) {
         exitPrice = entryPrice - targetPoints;
         exitTime = bar.time;
@@ -133,7 +232,6 @@ function simulateTrade(
       }
     }
 
-    // Last bar — close at market
     if (i === maxIdx) {
       exitPrice = bar.close;
       exitTime = bar.time;
@@ -145,11 +243,10 @@ function simulateTrade(
     ? exitPrice - entryPrice
     : entryPrice - exitPrice;
 
-  // Compute stop/target price levels
   let stopPrice: number | null = null;
   let targetPrice: number | null = null;
-  if (stopPoints > 0) {
-    stopPrice = direction === "long" ? entryPrice - stopPoints : entryPrice + stopPoints;
+  if (initialStopPts > 0) {
+    stopPrice = direction === "long" ? entryPrice - initialStopPts : entryPrice + initialStopPts;
   }
   if (targetPoints > 0) {
     targetPrice = direction === "long" ? entryPrice + targetPoints : entryPrice - targetPoints;
@@ -170,7 +267,7 @@ function simulateTrade(
     hitTarget,
     hitStop,
     timedOut,
-    riskPoints: stopPoints > 0 ? stopPoints : undefined,
+    riskPoints: initialStopPts > 0 ? initialStopPts : undefined,
   };
 }
 
@@ -244,7 +341,9 @@ function getMaxHold(holdToClose: string, barsLen: number, entryIdx: number): num
   return parseInt(holdToClose, 10) || (barsLen - entryIdx);
 }
 
-function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number | string>): TradeResult[] {
+type StrategyRunner = (day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts) => TradeResult[];
+
+function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts): TradeResult[] {
   const bars = day.bars;
   const n = Number(params.candles) || 5;
   const dir = String(params.direction);
@@ -254,7 +353,6 @@ function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number 
 
   if (bars.length <= n) return [];
 
-  // Compute opening range
   let rangeHigh = -Infinity;
   let rangeLow = Infinity;
   for (let i = 0; i < n; i++) {
@@ -264,11 +362,10 @@ function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number 
 
   const results: TradeResult[] = [];
 
-  // Scan for breakout after the range
   if (dir === "long" || dir === "both") {
     for (let i = n; i < bars.length; i++) {
       if (bars[i].high > rangeHigh) {
-        const trade = simulateTrade(bars, i, rangeHigh, "long", stopPts, targetPts, maxHold, day.date);
+        const trade = simulateTrade(bars, i, rangeHigh, "long", stopPts, targetPts, maxHold, day.date, mgmt);
         if (trade) results.push(trade);
         break;
       }
@@ -278,7 +375,7 @@ function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number 
   if (dir === "short" || dir === "both") {
     for (let i = n; i < bars.length; i++) {
       if (bars[i].low < rangeLow) {
-        const trade = simulateTrade(bars, i, rangeLow, "short", stopPts, targetPts, maxHold, day.date);
+        const trade = simulateTrade(bars, i, rangeLow, "short", stopPts, targetPts, maxHold, day.date, mgmt);
         if (trade) results.push(trade);
         break;
       }
@@ -288,7 +385,7 @@ function runOpeningRangeBreakout(day: TradingDay, params: Record<string, number 
   return results;
 }
 
-function runGapFade(day: TradingDay, params: Record<string, number | string>): TradeResult[] {
+function runGapFade(day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts): TradeResult[] {
   if (day.gapPercent === null || day.prevClose === null) return [];
 
   const bars = day.bars;
@@ -307,11 +404,11 @@ function runGapFade(day: TradingDay, params: Record<string, number | string>): T
     targetPts = Number(params.targetPoints) || 0;
   }
 
-  const trade = simulateTrade(bars, 0, entryPrice, direction, stopPts, targetPts, maxHold, day.date);
+  const trade = simulateTrade(bars, 0, entryPrice, direction, stopPts, targetPts, maxHold, day.date, mgmt);
   return trade ? [trade] : [];
 }
 
-function runFirstCandleDirection(day: TradingDay, params: Record<string, number | string>): TradeResult[] {
+function runFirstCandleDirection(day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts): TradeResult[] {
   const bars = day.bars;
   const n = Number(params.candles) || 1;
   const mode = String(params.mode);
@@ -321,7 +418,6 @@ function runFirstCandleDirection(day: TradingDay, params: Record<string, number 
 
   if (bars.length <= n) return [];
 
-  // Determine first N candle direction
   const firstOpen = bars[0].open;
   const nthClose = bars[n - 1].close;
   const firstGreen = nthClose > firstOpen;
@@ -334,11 +430,11 @@ function runFirstCandleDirection(day: TradingDay, params: Record<string, number 
   }
 
   const entryPrice = nthClose;
-  const trade = simulateTrade(bars, n, entryPrice, direction, stopPts, targetPts, maxHold, day.date);
+  const trade = simulateTrade(bars, n, entryPrice, direction, stopPts, targetPts, maxHold, day.date, mgmt);
   return trade ? [trade] : [];
 }
 
-function runTimeEntry(day: TradingDay, params: Record<string, number | string>): TradeResult[] {
+function runTimeEntry(day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts): TradeResult[] {
   const bars = day.bars;
   const entryBarIdx = Number(params.entryBar) || 0;
   const dir = String(params.direction) as "long" | "short";
@@ -349,11 +445,11 @@ function runTimeEntry(day: TradingDay, params: Record<string, number | string>):
   const entryBar = getBarAtIndex(bars, entryBarIdx);
   if (!entryBar) return [];
 
-  const trade = simulateTrade(bars, entryBarIdx, entryBar.open, dir, stopPts, targetPts, maxHold, day.date);
+  const trade = simulateTrade(bars, entryBarIdx, entryBar.open, dir, stopPts, targetPts, maxHold, day.date, mgmt);
   return trade ? [trade] : [];
 }
 
-function runPrevCloseRetest(day: TradingDay, params: Record<string, number | string>): TradeResult[] {
+function runPrevCloseRetest(day: TradingDay, params: Record<string, number | string>, mgmt?: ManagementOpts): TradeResult[] {
   if (day.prevClose === null) return [];
   const bars = day.bars;
   const pc = day.prevClose;
@@ -362,7 +458,6 @@ function runPrevCloseRetest(day: TradingDay, params: Record<string, number | str
   const targetPts = Number(params.targetPoints) || 0;
   const maxHold = getMaxHold(String(params.holdToClose), bars.length, 0);
 
-  // Find first bar that touches prev close
   for (let i = 0; i < bars.length; i++) {
     if (bars[i].low <= pc && bars[i].high >= pc) {
       let direction: "long" | "short";
@@ -371,7 +466,7 @@ function runPrevCloseRetest(day: TradingDay, params: Record<string, number | str
       } else {
         direction = dirParam as "long" | "short";
       }
-      const trade = simulateTrade(bars, i, pc, direction, stopPts, targetPts, maxHold, day.date);
+      const trade = simulateTrade(bars, i, pc, direction, stopPts, targetPts, maxHold, day.date, mgmt);
       return trade ? [trade] : [];
     }
   }
@@ -380,7 +475,7 @@ function runPrevCloseRetest(day: TradingDay, params: Record<string, number | str
 
 // ── Main Runner ──
 
-const RUNNER_MAP: Record<string, (day: TradingDay, params: Record<string, number | string>) => TradeResult[]> = {
+const RUNNER_MAP: Record<string, StrategyRunner> = {
   opening_range_breakout: runOpeningRangeBreakout,
   gap_fade: runGapFade,
   first_candle_direction: runFirstCandleDirection,
@@ -393,6 +488,7 @@ export function runStrategy(
   params: Record<string, number | string>,
   days: TradingDay[],
   filterDescription: string,
+  mgmt?: ManagementOpts,
 ): StrategyResult {
   const runner = RUNNER_MAP[strategyId];
   const stratDef = STRATEGIES.find(s => s.id === strategyId)!;
@@ -400,7 +496,7 @@ export function runStrategy(
 
   for (const day of days) {
     if (day.bars.length < 5) continue;
-    const trades = runner(day, params);
+    const trades = runner(day, params, mgmt);
     allTrades.push(...trades);
   }
 
