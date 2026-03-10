@@ -1,23 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #06080d;
-  --surface: #0d1117;
-  --surface-2: #161b22;
-  --surface-hover: #1c2333;
-  --border: #21262d;
-  --border-bright: #30363d;
-  --text: #e6edf3;
-  --text-muted: #7d8590;
-  --text-dim: #484f58;
-  --green: #3fb950;
-  --green-dim: #238636;
-  --red: #f85149;
-  --red-dim: #da3633;
-  --accent: #58a6ff;
-  --accent-dim: #1f6feb;
-  --orange: #d29922;
-  --purple: #bc8cff;
+  --bg: #050608;
+  --bg-subtle: #0a0c10;
+  --surface: #0c0f15;
+  --surface-2: #12161e;
+  --surface-3: #181d27;
+  --surface-hover: #1a2030;
+  --border: #1a1f2e;
+  --border-bright: #252d3f;
+  --border-glow: #2a3550;
+  --text: #e8edf5;
+  --text-secondary: #a0aabe;
+  --text-muted: #6b7694;
+  --text-dim: #3d4560;
+  --green: #00e676;
+  --green-mid: #00c853;
+  --green-dim: #0a3d24;
+  --red: #ff5252;
+  --red-mid: #ef4444;
+  --red-dim: #3d1418;
+  --accent: #60a5fa;
+  --accent-bright: #93c5fd;
+  --accent-dim: #1e40af;
+  --accent-glow: #1e3a5f;
+  --orange: #ffab40;
+  --purple: #c084fc;
+  --purple-dim: #7c3aed;
+  --cyan: #22d3ee;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
 }
 
 * {
@@ -28,104 +41,191 @@
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   overflow: hidden;
   height: 100vh;
 }
 
-/* Custom scrollbar for Webkit */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border-bright);
-  border-radius: 3px;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-glow);
 }
 
-/* Filter inputs */
-select, input[type="number"], input[type="date"], input[type="text"], input[type="password"] {
-  background: var(--bg);
+/* ── Glass panels ── */
+.glass-panel {
+  background: linear-gradient(145deg, rgba(12, 15, 21, 0.9), rgba(18, 22, 30, 0.8));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.02);
+}
+.glass-panel-sm {
+  background: linear-gradient(145deg, rgba(12, 15, 21, 0.9), rgba(18, 22, 30, 0.8));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.02);
+}
+
+/* ── Inputs ── */
+select, input[type="number"], input[type="date"], input[type="text"], input[type="password"], textarea {
+  background: var(--bg-subtle);
   border: 1px solid var(--border);
   color: var(--text);
-  border-radius: 6px;
-  padding: 4px 8px;
-  font-size: 12px;
-  transition: border-color 0.15s;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
+  font-size: 11px;
+  transition: border-color 0.2s, box-shadow 0.2s;
   outline: none;
   width: 100%;
+  font-family: inherit;
 }
-select:focus, input:focus {
+select:focus, input:focus, textarea:focus {
   border-color: var(--accent-dim);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.1);
 }
+select option { background: var(--surface-2); }
 
-select option {
-  background: var(--surface);
-}
-
-/* Stat pill badges */
+/* ── Stat badges ── */
 .stat-badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 3px 10px;
+  border-radius: 20px;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 .stat-badge.green {
-  background: color-mix(in srgb, var(--green) 15%, transparent);
+  background: rgba(0, 230, 118, 0.1);
   color: var(--green);
+  border: 1px solid rgba(0, 230, 118, 0.15);
 }
 .stat-badge.red {
-  background: color-mix(in srgb, var(--red) 15%, transparent);
+  background: rgba(255, 82, 82, 0.1);
   color: var(--red);
+  border: 1px solid rgba(255, 82, 82, 0.15);
 }
 .stat-badge.blue {
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  background: rgba(96, 165, 250, 0.1);
   color: var(--accent);
+  border: 1px solid rgba(96, 165, 250, 0.15);
 }
 .stat-badge.neutral {
-  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  background: rgba(107, 118, 148, 0.1);
   color: var(--text-muted);
+  border: 1px solid rgba(107, 118, 148, 0.12);
 }
 
-/* Markdown rendering in AI panel */
-.ai-content h2, .ai-content h3 {
-  font-size: 13px;
+/* ── Buttons ── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-dim), var(--accent));
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--accent);
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.3);
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(30, 64, 175, 0.4); }
+.btn-primary:active { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
+
+.btn-purple {
+  background: linear-gradient(135deg, var(--purple-dim), var(--purple));
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
+}
+.btn-purple:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-purple:active { transform: translateY(0); }
+.btn-purple:disabled { opacity: 0.35; cursor: default; transform: none; box-shadow: none; }
+
+/* ── AI content ── */
+.ai-content h2, .ai-content h3 {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-bright);
   margin-top: 12px;
   margin-bottom: 4px;
+  letter-spacing: -0.01em;
 }
-.ai-content h2:first-child, .ai-content h3:first-child {
-  margin-top: 0;
-}
-.ai-content p {
-  margin: 4px 0;
-  line-height: 1.5;
-}
-.ai-content ul {
-  padding-left: 16px;
-  margin: 4px 0;
-}
-.ai-content li {
-  margin: 2px 0;
-  line-height: 1.5;
-}
-.ai-content strong {
-  color: var(--text);
-  font-weight: 600;
-}
+.ai-content h2:first-child, .ai-content h3:first-child { margin-top: 0; }
+.ai-content p { margin: 4px 0; line-height: 1.6; }
+.ai-content ul { padding-left: 16px; margin: 4px 0; }
+.ai-content li { margin: 2px 0; line-height: 1.6; }
+.ai-content strong { color: var(--text); font-weight: 600; }
 
-/* Pulse animation for AI loading */
+/* ── Animations ── */
 @keyframes pulse-glow {
-  0%, 100% { opacity: 0.4; }
+  0%, 100% { opacity: 0.3; }
   50% { opacity: 1; }
 }
-.pulse-glow {
-  animation: pulse-glow 1.5s ease-in-out infinite;
+.pulse-glow { animation: pulse-glow 1.5s ease-in-out infinite; }
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.03) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.fade-in { animation: fade-in 0.3s ease-out; }
+
+/* ── Tab component ── */
+.tab-btn {
+  flex: 1;
+  font-size: 10px;
+  padding: 6px 0;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  background: none;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+}
+.tab-btn.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: rgba(96, 165, 250, 0.05);
+}
+.tab-btn.active-purple {
+  color: var(--purple);
+  border-bottom-color: var(--purple);
+  background: rgba(192, 132, 252, 0.05);
+}
+.tab-btn:not(.active):not(.active-purple) {
+  color: var(--text-dim);
+}
+.tab-btn:not(.active):not(.active-purple):hover {
+  color: var(--text-muted);
+  background: rgba(255,255,255,0.02);
 }

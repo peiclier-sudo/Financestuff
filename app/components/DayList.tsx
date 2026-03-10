@@ -21,7 +21,7 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
 
   if (days.length === 0) {
     return (
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
+      <div className="glass-panel flex items-center justify-center h-full text-[var(--text-muted)] text-xs">
         No days match your filters
       </div>
     );
@@ -31,7 +31,7 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
   const multiSelected = selectedDates.length > 1;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+    <div className="glass-panel overflow-hidden flex flex-col h-full">
       {multiSelected && (
         <div className="px-1.5 py-0.5 bg-[var(--accent-dim)]/10 border-b border-[var(--border)] text-[9px] text-[var(--accent)] flex items-center justify-between flex-shrink-0">
           <span>{selectedDates.length} days selected — Ctrl+click to toggle</span>
@@ -45,15 +45,15 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
       )}
       <div className="overflow-y-auto flex-1">
         <table className="w-full text-[10px]">
-          <thead className="sticky top-0 bg-[var(--surface-2)] border-b border-[var(--border)] z-10">
+          <thead className="sticky top-0 bg-[var(--surface-2)]/90 backdrop-blur-sm border-b border-[var(--border)] z-10">
             <tr>
-              <th className="text-left px-1.5 py-1 text-[var(--text-dim)] font-medium">Date</th>
-              <th className="text-center px-0.5 py-1 text-[var(--text-dim)] font-medium w-5">D</th>
-              <th className="text-center px-0.5 py-1 text-[var(--text-dim)] font-medium w-5">P</th>
-              <th className="text-right px-1 py-1 text-[var(--text-dim)] font-medium">Gap</th>
-              <th className="text-right px-1 py-1 text-[var(--text-dim)] font-medium">Chg</th>
-              <th className="text-right px-1 py-1 text-[var(--text-dim)] font-medium">Rng</th>
-              <th className="text-right px-1.5 py-1 text-[var(--text-dim)] font-medium w-12">Cl</th>
+              <th className="text-left px-1.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Date</th>
+              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-5">D</th>
+              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-5">P</th>
+              <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Gap</th>
+              <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Chg</th>
+              <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Rng</th>
+              <th className="text-right px-1.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-12 uppercase tracking-wider">Cl</th>
             </tr>
           </thead>
           <tbody>
@@ -71,15 +71,15 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
                     e.preventDefault();
                     onSelect(day.date, e.ctrlKey || e.metaKey);
                   }}
-                  className={`cursor-pointer border-b border-[var(--border)] transition-all duration-100 ${
+                  className={`cursor-pointer border-b border-[var(--border)]/50 transition-all duration-150 ${
                     isPrimary
-                      ? "bg-[var(--accent-dim)]/15 border-l-2 border-l-[var(--accent)]"
+                      ? "bg-[var(--accent-dim)]/12 border-l-2 border-l-[var(--accent)] shadow-[inset_0_0_20px_rgba(96,165,250,0.04)]"
                       : isSecondary
-                        ? "bg-[#58a6ff10] border-l-2 border-l-[#58a6ff60]"
+                        ? "bg-[var(--accent)]/5 border-l-2 border-l-[var(--accent)]/40"
                         : "hover:bg-[var(--surface-hover)] border-l-2 border-l-transparent"
                   }`}
                 >
-                  <td className="px-1.5 py-0.5 font-mono text-[var(--text-muted)]">
+                  <td className="px-1.5 py-[3px] font-[JetBrains_Mono,monospace] text-[var(--text-secondary)] text-[10px]">
                     {day.date.slice(5)} <span className="text-[var(--text-dim)]">{day.dayName.slice(0, 2)}</span>
                   </td>
                   <td className="px-0.5 py-0.5 text-center">

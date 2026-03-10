@@ -18,21 +18,21 @@ export default function FilterPanel({ criteria, onChange, resultCount, totalCoun
   const pct = totalCount > 0 ? ((resultCount / totalCount) * 100).toFixed(0) : "0";
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
+    <div className="glass-panel overflow-hidden">
       {/* Header bar */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]/50">
         <div className="flex items-center gap-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">Filters</h2>
-          <div className="flex items-center gap-1.5">
+          <h2 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Filters</h2>
+          <div className="flex items-center gap-2">
             <span className="stat-badge blue">{resultCount.toLocaleString()} / {totalCount.toLocaleString()}</span>
-            <span className="text-[10px] text-[var(--text-dim)]">({pct}%)</span>
+            <span className="text-[10px] text-[var(--text-dim)] font-medium">({pct}%)</span>
           </div>
         </div>
         <button
           onClick={onReset}
-          className="text-[11px] text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+          className="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors cursor-pointer uppercase tracking-wide font-medium"
         >
-          Reset all
+          Reset
         </button>
       </div>
 
@@ -167,7 +167,7 @@ export default function FilterPanel({ criteria, onChange, resultCount, totalCoun
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <label className="block text-[10px] text-[var(--text-dim)] mb-0.5 uppercase tracking-wider">{label}</label>
+      <label className="block text-[9px] text-[var(--text-dim)] mb-1 uppercase tracking-widest font-medium">{label}</label>
       {children}
     </div>
   );

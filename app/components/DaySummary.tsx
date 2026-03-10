@@ -14,8 +14,8 @@ export default function DaySummary({ days }: Props) {
     const day = days[0];
     const isBull = day.changePercent > 0;
     return (
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
-        <div className="px-2 py-1 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between">
+      <div className="glass-panel-sm overflow-hidden fade-in">
+        <div className="px-2.5 py-1.5 border-b border-[var(--border)] bg-[var(--surface-2)]/50 flex items-center justify-between">
           <h3 className="text-[10px] font-medium text-[var(--text-dim)]">Day Summary</h3>
           <span className={`text-[10px] font-mono font-semibold ${isBull ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
             {isBull ? "BULL" : "BEAR"} {day.changePercent > 0 ? "+" : ""}{day.changePercent.toFixed(2)}%
@@ -58,8 +58,8 @@ export default function DaySummary({ days }: Props) {
   const minChg = Math.min(...days.map(d => d.changePercent));
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden">
-      <div className="px-2 py-1 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between">
+    <div className="glass-panel-sm overflow-hidden fade-in">
+      <div className="px-2.5 py-1.5 border-b border-[var(--border)] bg-[var(--surface-2)]/50 flex items-center justify-between">
         <h3 className="text-[10px] font-medium text-[var(--text-dim)]">
           Range Summary ({n} days)
         </h3>
@@ -90,8 +90,8 @@ export default function DaySummary({ days }: Props) {
 function M({ l, v, c }: { l: string; v: string; c?: "g" | "r" }) {
   return (
     <div className="flex items-center justify-between">
-      <span className="text-[var(--text-dim)]">{l}</span>
-      <span className={`font-mono ${c === "g" ? "text-[var(--green)]" : c === "r" ? "text-[var(--red)]" : ""}`}>{v}</span>
+      <span className="text-[var(--text-dim)] text-[9px] uppercase">{l}</span>
+      <span className={`font-[JetBrains_Mono,monospace] text-[10px] ${c === "g" ? "text-[var(--green)]" : c === "r" ? "text-[var(--red)]" : "text-[var(--text-secondary)]"}`}>{v}</span>
     </div>
   );
 }
