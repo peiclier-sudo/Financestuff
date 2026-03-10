@@ -4,9 +4,10 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { TradingDay, FilterCriteria } from "@/lib/types";
 import { parseCSV, groupIntoDays, filterDays, computeStats } from "@/lib/dataUtils";
 import { buildFilterDescription } from "@/lib/filterDescription";
+import { StrategyResult, TradeResult } from "@/lib/strategies";
 import FilterPanel from "./components/FilterPanel";
 import DayList from "./components/DayList";
-import CandlestickChart from "./components/CandlestickChart";
+import CandlestickChart, { TradeHighlight } from "./components/CandlestickChart";
 import StatsBar from "./components/StatsBar";
 import DaySummary from "./components/DaySummary";
 import AIAnalysis from "./components/AIAnalysis";
@@ -36,6 +37,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"ai" | "strategy">("strategy");
+  const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
 
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -75,36 +77,51 @@ export default function Home() {
     [selectedDates, allDaysMap]
   );
 
-  // Overlay days = all selected except primary
-  const overlayDays = useMemo(() => {
-    if (selectedDates.length <= 1) return undefined;
-    return selectedDates
-      .slice(0, -1) // exclude primary (last)
-      .map(date => {
-        const day = allDaysMap.get(date);
-        return day ? { date, bars: day.bars } : null;
-      })
-      .filter((d): d is { date: string; bars: typeof allDays[0]["bars"] } => d != null);
-  }, [selectedDates, allDaysMap, allDays]);
+  // Compute range data from all selected days (when >1 selected)
+  const rangeData = useMemo(() => {
+    if (selectedDayObjects.length <= 1) return null;
+    const high = Math.max(...selectedDayObjects.map(d => d.high));
+    const low = Math.min(...selectedDayObjects.map(d => d.low));
+    return { high, low, label: `${selectedDayObjects.length} days` };
+  }, [selectedDayObjects]);
+
+  // Find trade for current primary day from strategy results
+  const tradeForDay: TradeHighlight | null = useMemo(() => {
+    if (!strategyResult || !primaryDate) return null;
+    const trade = strategyResult.trades.find((t: TradeResult) => t.date === primaryDate);
+    if (!trade) return null;
+    return {
+      direction: trade.direction,
+      entryPrice: trade.entryPrice,
+      entryTime: trade.entryTime,
+      exitPrice: trade.exitPrice,
+      exitTime: trade.exitTime,
+      pnlPoints: trade.pnlPoints,
+      hitTarget: trade.hitTarget,
+      hitStop: trade.hitStop,
+    };
+  }, [strategyResult, primaryDate]);
 
   const handleSelect = useCallback((date: string, ctrlKey: boolean) => {
     if (ctrlKey) {
       setSelectedDates(prev => {
         if (prev.includes(date)) {
-          // Remove it, but keep at least 1 selected
           const next = prev.filter(d => d !== date);
           return next.length > 0 ? next : [date];
         }
         return [...prev, date];
       });
     } else {
-      // Normal click: replace selection
       setSelectedDates([date]);
     }
   }, []);
 
   const handleReset = useCallback(() => {
     setCriteria(DEFAULT_CRITERIA);
+  }, []);
+
+  const handleStrategyResult = useCallback((result: StrategyResult | null) => {
+    setStrategyResult(result);
   }, []);
 
   // Keyboard navigation (moves primary, resets to single selection)
@@ -181,7 +198,7 @@ export default function Home() {
         <StatsBar stats={stats} />
       </div>
 
-      {/* Main content: 3 columns — left narrow (summary + list), center wide (chart), right narrow (AI) */}
+      {/* Main content: 3 columns */}
       <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
         {/* Left: Summary on top, day list below */}
         <div className="col-span-3 flex flex-col gap-1 min-h-0">
@@ -195,14 +212,15 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Center: Chart — full height */}
+        {/* Center: Chart */}
         <div className="col-span-6 min-h-0">
           {primaryDay ? (
             <CandlestickChart
               bars={primaryDay.bars}
-              title={`${primaryDay.date} ${primaryDay.dayName} — ${primaryDay.bars.length} bars${selectedDates.length > 1 ? ` (+${selectedDates.length - 1} overlay)` : ""}`}
+              title={`${primaryDay.date} ${primaryDay.dayName} — ${primaryDay.bars.length} bars${selectedDates.length > 1 ? ` (${selectedDates.length} selected)` : ""}`}
               prevClose={primaryDay.prevClose}
-              overlayDays={overlayDays}
+              range={rangeData}
+              trade={tradeForDay}
             />
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full">
@@ -214,7 +232,7 @@ export default function Home() {
           )}
         </div>
 
-        {/* Right: Tabbed panel — Strategy Lab / AI Analysis */}
+        {/* Right: Tabbed panel */}
         <div className="col-span-3 min-h-0 flex flex-col">
           <div className="flex bg-[var(--surface)] border border-b-0 border-[var(--border)] rounded-t-lg overflow-hidden flex-shrink-0">
             <button
@@ -240,7 +258,11 @@ export default function Home() {
           </div>
           <div className="flex-1 min-h-0">
             {rightTab === "strategy" ? (
-              <StrategyLab days={filteredDays} filterDescription={buildFilterDescription(criteria)} />
+              <StrategyLab
+                days={filteredDays}
+                filterDescription={buildFilterDescription(criteria)}
+                onResult={handleStrategyResult}
+              />
             ) : (
               <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
             )}

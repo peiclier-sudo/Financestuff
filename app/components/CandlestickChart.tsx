@@ -1,34 +1,39 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
+import { createChart, CandlestickSeries, LineSeries, createSeriesMarkers } from "lightweight-charts";
 import { Bar } from "@/lib/types";
 
-// Colors for overlay lines (up to 12 distinct)
-const OVERLAY_COLORS = [
-  "#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899", "#10b981",
-  "#6366f1", "#14b8a6", "#f97316", "#a855f7", "#22d3ee",
-  "#84cc16", "#e879f9",
-];
+export interface TradeHighlight {
+  direction: "long" | "short";
+  entryPrice: number;
+  entryTime: number;
+  exitPrice: number;
+  exitTime: number;
+  pnlPoints: number;
+  hitTarget: boolean;
+  hitStop: boolean;
+}
 
-interface OverlayDay {
-  date: string;
-  bars: Bar[];
+interface RangeData {
+  high: number;
+  low: number;
+  label: string; // e.g. "3 days"
 }
 
 interface Props {
   bars: Bar[];
   title?: string;
   prevClose?: number | null;
-  overlayDays?: OverlayDay[];
+  range?: RangeData | null;
+  trade?: TradeHighlight | null;
 }
 
-export default function CandlestickChart({ bars, title, prevClose, overlayDays }: Props) {
+export default function CandlestickChart({ bars, title, prevClose, range, trade }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showPrevClose, setShowPrevClose] = useState(true);
-  const [showOverlay, setShowOverlay] = useState(true);
-
-  const hasOverlays = overlayDays && overlayDays.length > 0;
+  const [showRange, setShowRange] = useState(true);
+  const [showTrade, setShowTrade] = useState(true);
 
   useEffect(() => {
     if (!containerRef.current || bars.length === 0) return;
@@ -70,15 +75,18 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
       wickDownColor: "#f8514980",
     });
 
+    type TS = import("lightweight-charts").UTCTimestamp;
     const data = bars.map((b) => ({
-      time: b.time as import("lightweight-charts").UTCTimestamp,
+      time: b.time as TS,
       open: b.open,
       high: b.high,
       low: b.low,
       close: b.close,
     }));
-
     series.setData(data);
+
+    const t0 = bars[0].time as TS;
+    const tN = bars[bars.length - 1].time as TS;
 
     // Previous close horizontal line
     if (showPrevClose && prevClose != null && bars.length >= 2) {
@@ -91,8 +99,8 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
         lastValueVisible: false,
       });
       lineSeries.setData([
-        { time: bars[0].time as import("lightweight-charts").UTCTimestamp, value: prevClose },
-        { time: bars[bars.length - 1].time as import("lightweight-charts").UTCTimestamp, value: prevClose },
+        { time: t0, value: prevClose },
+        { time: tN, value: prevClose },
       ]);
       lineSeries.createPriceLine({
         price: prevClose,
@@ -106,43 +114,135 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
       });
     }
 
-    // Overlay days: remap their bars onto the primary day's time axis
-    if (showOverlay && hasOverlays) {
-      const primaryStart = bars[0].time;
+    // Range band: high/low horizontal lines across entire chart
+    if (showRange && range) {
+      // High line
+      const highLine = chart.addSeries(LineSeries, {
+        color: "#8b5cf680",
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+      });
+      highLine.setData([
+        { time: t0, value: range.high },
+        { time: tN, value: range.high },
+      ]);
+      highLine.createPriceLine({
+        price: range.high,
+        color: "#8b5cf6",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `Rng H`,
+        axisLabelColor: "#8b5cf6",
+        axisLabelTextColor: "#0d1117",
+      });
 
-      for (let oi = 0; oi < overlayDays!.length; oi++) {
-        const oDay = overlayDays![oi];
-        if (oDay.bars.length === 0) continue;
-        const oStart = oDay.bars[0].time;
-        const color = OVERLAY_COLORS[oi % OVERLAY_COLORS.length];
+      // Low line
+      const lowLine = chart.addSeries(LineSeries, {
+        color: "#8b5cf680",
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+      });
+      lowLine.setData([
+        { time: t0, value: range.low },
+        { time: tN, value: range.low },
+      ]);
+      lowLine.createPriceLine({
+        price: range.low,
+        color: "#8b5cf6",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `Rng L`,
+        axisLabelColor: "#8b5cf6",
+        axisLabelTextColor: "#0d1117",
+      });
+    }
 
-        // Remap overlay bars onto the primary time axis by offset
-        const remapped = oDay.bars
-          .map((b) => ({
-            time: (primaryStart + (b.time - oStart)) as import("lightweight-charts").UTCTimestamp,
-            open: b.open,
-            high: b.high,
-            low: b.low,
-            close: b.close,
-          }))
-          // Only keep bars that fall within the primary range
-          .filter((b) => b.time >= bars[0].time && b.time <= bars[bars.length - 1].time);
+    // Trade highlight: entry/exit markers + horizontal lines
+    if (showTrade && trade) {
+      const isWin = trade.pnlPoints >= 0;
+      const tradeColor = isWin ? "#3fb950" : "#f85149";
 
-        if (remapped.length < 2) continue;
+      // Entry line
+      const entryLine = chart.addSeries(LineSeries, {
+        color: "#58a6ff80",
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+      });
+      entryLine.setData([
+        { time: t0, value: trade.entryPrice },
+        { time: tN, value: trade.entryPrice },
+      ]);
+      entryLine.createPriceLine({
+        price: trade.entryPrice,
+        color: "#58a6ff",
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `Entry`,
+        axisLabelColor: "#58a6ff",
+        axisLabelTextColor: "#0d1117",
+      });
 
-        const overlaySeries = chart.addSeries(LineSeries, {
-          color,
-          lineWidth: 1,
-          priceLineVisible: false,
-          crosshairMarkerVisible: false,
-          lastValueVisible: false,
-          lineStyle: 0,
-        });
+      // Exit line
+      const exitLine = chart.addSeries(LineSeries, {
+        color: tradeColor + "80",
+        lineWidth: 1,
+        lineStyle: 2,
+        priceLineVisible: false,
+        crosshairMarkerVisible: false,
+        lastValueVisible: false,
+      });
+      exitLine.setData([
+        { time: t0, value: trade.exitPrice },
+        { time: tN, value: trade.exitPrice },
+      ]);
+      exitLine.createPriceLine({
+        price: trade.exitPrice,
+        color: tradeColor,
+        lineWidth: 1,
+        lineStyle: 2,
+        axisLabelVisible: true,
+        title: `Exit ${trade.pnlPoints >= 0 ? "+" : ""}${trade.pnlPoints.toFixed(1)}`,
+        axisLabelColor: tradeColor,
+        axisLabelTextColor: "#0d1117",
+      });
 
-        overlaySeries.setData(remapped.map((b) => ({
-          time: b.time,
-          value: b.close,
-        })));
+      // Markers for entry/exit on the candlestick series
+      // Find closest bar indices for entry/exit times
+      const entryIdx = findClosestBarIndex(bars, trade.entryTime);
+      const exitIdx = findClosestBarIndex(bars, trade.exitTime);
+
+      if (entryIdx >= 0 && exitIdx >= 0) {
+        const markers: import("lightweight-charts").SeriesMarker<TS>[] = [
+          {
+            time: bars[entryIdx].time as TS,
+            position: trade.direction === "long" ? "belowBar" : "aboveBar",
+            color: "#58a6ff",
+            shape: trade.direction === "long" ? "arrowUp" : "arrowDown",
+            text: `${trade.direction === "long" ? "BUY" : "SELL"} ${trade.entryPrice.toFixed(1)}`,
+          },
+          {
+            time: bars[exitIdx].time as TS,
+            position: trade.direction === "long" ? "aboveBar" : "belowBar",
+            color: tradeColor,
+            shape: trade.hitTarget ? "circle" : trade.hitStop ? "square" : "circle",
+            text: `${trade.hitTarget ? "TP" : trade.hitStop ? "SL" : "EOD"} ${trade.exitPrice.toFixed(1)}`,
+          },
+        ];
+        // Sort markers by time (required by lightweight-charts)
+        markers.sort((a, b) => (a.time as number) - (b.time as number));
+        createSeriesMarkers(series, markers);
       }
     }
 
@@ -162,7 +262,7 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
       window.removeEventListener("resize", handleResize);
       chart.remove();
     };
-  }, [bars, prevClose, showPrevClose, overlayDays, showOverlay, hasOverlays]);
+  }, [bars, prevClose, showPrevClose, range, showRange, trade, showTrade]);
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
@@ -170,15 +270,26 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
         <div className="px-3 py-1 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between flex-shrink-0">
           <h3 className="text-[10px] font-medium text-[var(--text-muted)]">{title}</h3>
           <div className="flex items-center gap-3">
-            {hasOverlays && (
+            {range && (
               <label className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] cursor-pointer select-none">
                 <input
                   type="checkbox"
-                  checked={showOverlay}
-                  onChange={(e) => setShowOverlay(e.target.checked)}
+                  checked={showRange}
+                  onChange={(e) => setShowRange(e.target.checked)}
                   className="w-3 h-3 accent-[#8b5cf6]"
                 />
-                <span style={{ color: "#8b5cf6" }}>Overlay ({overlayDays!.length})</span>
+                <span style={{ color: "#8b5cf6" }}>Range ({range.label})</span>
+              </label>
+            )}
+            {trade && (
+              <label className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showTrade}
+                  onChange={(e) => setShowTrade(e.target.checked)}
+                  className="w-3 h-3 accent-[#58a6ff]"
+                />
+                <span style={{ color: "#58a6ff" }}>Trade</span>
               </label>
             )}
             {prevClose != null && (
@@ -198,4 +309,17 @@ export default function CandlestickChart({ bars, title, prevClose, overlayDays }
       <div ref={containerRef} className="flex-1 min-h-0" />
     </div>
   );
+}
+
+function findClosestBarIndex(bars: Bar[], targetTime: number): number {
+  let closest = 0;
+  let minDiff = Math.abs(bars[0].time - targetTime);
+  for (let i = 1; i < bars.length; i++) {
+    const diff = Math.abs(bars[i].time - targetTime);
+    if (diff < minDiff) {
+      minDiff = diff;
+      closest = i;
+    }
+  }
+  return closest;
 }
