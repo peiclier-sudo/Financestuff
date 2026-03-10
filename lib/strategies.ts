@@ -35,6 +35,7 @@ export interface TradeResult {
   hitTarget: boolean;
   hitStop: boolean;
   timedOut: boolean;
+  riskPoints?: number; // initial stop distance for R:R calculation
 }
 
 export interface StrategyResult {
@@ -169,6 +170,7 @@ function simulateTrade(
     hitTarget,
     hitStop,
     timedOut,
+    riskPoints: stopPoints > 0 ? stopPoints : undefined,
   };
 }
 

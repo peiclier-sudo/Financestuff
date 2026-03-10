@@ -89,6 +89,12 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
   const [viewingCustom, setViewingCustom] = useState<CustomStrategyDef | null>(null);
   const [showAiTrades, setShowAiTrades] = useState(false);
 
+  // ── Management params ──
+  const [trailMode, setTrailMode] = useState<"none" | "candle_hl" | "atr">("none");
+  const [trailValue, setTrailValue] = useState(1);
+  const [beMode, setBeMode] = useState<"none" | "points" | "atr" | "rr">("none");
+  const [beThreshold, setBeThreshold] = useState(0);
+
   // Init defaults for preset
   useEffect(() => {
     const defaults: Record<string, number | string> = {};
@@ -167,6 +173,10 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         atrLength: raw.atrLength,
         holdToClose: raw.holdToClose ?? true,
         maxHoldBars: raw.maxHoldBars,
+        trailMode: trailMode !== "none" ? trailMode : undefined,
+        trailValue: trailMode !== "none" ? trailValue : undefined,
+        beMode: beMode !== "none" ? beMode : undefined,
+        beThreshold: beMode !== "none" ? beThreshold : undefined,
         timestamp: Date.now(),
       };
 
@@ -191,12 +201,20 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
 
   const handleRunSavedCustom = useCallback((strat: CustomStrategyDef) => {
     setViewingCustom(strat);
-    const trades = runCustomStrategy(strat, days);
+    // Apply current management params on top of saved strategy
+    const withMgmt = {
+      ...strat,
+      trailMode: trailMode !== "none" ? trailMode : strat.trailMode,
+      trailValue: trailMode !== "none" ? trailValue : strat.trailValue,
+      beMode: beMode !== "none" ? beMode : strat.beMode,
+      beThreshold: beMode !== "none" ? beThreshold : strat.beThreshold,
+    };
+    const trades = runCustomStrategy(withMgmt, days);
     const stratResult = buildResult(trades, strat.name, filterDescription, days.length);
     setAiResult(stratResult);
     setAiStrategy(strat);
     setShowAiTrades(false);
-  }, [days, filterDescription]);
+  }, [days, filterDescription, trailMode, trailValue, beMode, beThreshold]);
 
   const handleDeleteCustom = useCallback((id: string) => {
     const updated = deleteCustomStrategy(id);
@@ -229,243 +247,328 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-2 space-y-2 text-[10px]">
+      <div className="flex-1 flex flex-col min-h-0 p-2 text-[10px]">
         {tab === "preset" ? (
           <>
-            {/* Strategy selector */}
-            <div>
-              <label className="text-[var(--text-dim)] mb-0.5 block">Strategy</label>
-              <select
-                value={selectedStrategy.id}
-                onChange={e => setSelectedStrategy(STRATEGIES.find(s => s.id === e.target.value)!)}
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)]"
-              >
-                {STRATEGIES.map(s => (
-                  <option key={s.id} value={s.id}>{s.label}</option>
-                ))}
-              </select>
-              <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
-            </div>
-
-            {/* Params */}
-            <div className="grid grid-cols-2 gap-x-2 gap-y-1">
-              {selectedStrategy.fields.map(field => (
-                <div key={field.key}>
-                  <label className="text-[var(--text-dim)] block mb-0.5">{field.label}</label>
-                  {field.type === "select" ? (
-                    <select
-                      value={String(params[field.key] ?? field.default)}
-                      onChange={e => setParams(p => ({ ...p, [field.key]: e.target.value }))}
-                      className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)]"
-                    >
-                      {field.options!.map(o => (
-                        <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="number"
-                      value={Number(params[field.key] ?? field.default)}
-                      min={field.min}
-                      max={field.max}
-                      step={field.step}
-                      onChange={e => setParams(p => ({ ...p, [field.key]: Number(e.target.value) }))}
-                      className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)] font-mono"
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Run button */}
-            <button
-              onClick={handleRun}
-              disabled={running || days.length === 0}
-              className="w-full btn-primary py-1.5"
-            >
-              {running ? "Running..." : "Run Backtest"}
-            </button>
-
-            {/* Results */}
-            {presetActiveResult && (
-              <ResultsPanel
-                result={presetActiveResult}
-                isViewingSaved={!!viewingSaved}
-                showTrades={showTrades}
-                onToggleTrades={() => setShowTrades(t => !t)}
-                onSave={!viewingSaved && result ? handleSave : undefined}
-              />
-            )}
-
-            {/* Saved results */}
-            {savedResults.length > 0 && (
-              <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-                <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="font-semibold text-[var(--text-dim)] text-[9px] uppercase tracking-wide">Saved Results ({savedResults.length})</span>
-                </div>
-                <div className="max-h-36 overflow-y-auto">
-                  {savedResults.map(sr => (
-                    <div
-                      key={sr.timestamp}
-                      className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between ${
-                        viewingSaved?.timestamp === sr.timestamp ? "bg-[var(--accent-dim)]/15" : ""
-                      }`}
-                      onClick={() => { setViewingSaved(sr); setShowTrades(false); }}
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-[var(--text-muted)] truncate">{sr.strategyLabel}</div>
-                        <div className="text-[9px] text-[var(--text-dim)] truncate">{sr.filterDescription}</div>
-                      </div>
-                      <div className="flex items-center gap-2 ml-2 flex-shrink-0">
-                        <span className={`font-mono font-semibold ${sr.totalPnlPoints >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-                          {sr.totalPnlPoints >= 0 ? "+" : ""}{sr.totalPnlPoints.toFixed(0)}
-                        </span>
-                        <span className="text-[var(--text-dim)]">{sr.winRate.toFixed(0)}%</span>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDelete(sr.timestamp); }}
-                          className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px]"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
+            {/* Strategy controls - compact, non-scrolling */}
+            <div className="flex-shrink-0 space-y-2 mb-2">
+              <div>
+                <label className="text-[var(--text-dim)] mb-0.5 block">Strategy</label>
+                <select
+                  value={selectedStrategy.id}
+                  onChange={e => setSelectedStrategy(STRATEGIES.find(s => s.id === e.target.value)!)}
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)]"
+                >
+                  {STRATEGIES.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
                   ))}
+                </select>
+                <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
+              </div>
+
+              {/* Params */}
+              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+                {selectedStrategy.fields.map(field => (
+                  <div key={field.key}>
+                    <label className="text-[var(--text-dim)] block mb-0.5">{field.label}</label>
+                    {field.type === "select" ? (
+                      <select
+                        value={String(params[field.key] ?? field.default)}
+                        onChange={e => setParams(p => ({ ...p, [field.key]: e.target.value }))}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)]"
+                      >
+                        {field.options!.map(o => (
+                          <option key={String(o.value)} value={String(o.value)}>{o.label}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        value={Number(params[field.key] ?? field.default)}
+                        min={field.min}
+                        max={field.max}
+                        step={field.step}
+                        onChange={e => setParams(p => ({ ...p, [field.key]: Number(e.target.value) }))}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-0.5 text-[10px] text-[var(--text)] font-mono"
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Run button */}
+              <button
+                onClick={handleRun}
+                disabled={running || days.length === 0}
+                className="w-full btn-primary py-1.5"
+              >
+                {running ? "Running..." : "Run Backtest"}
+              </button>
+
+              {/* Saved results */}
+              {savedResults.length > 0 && (
+                <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
+                  <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                    <span className="font-semibold text-[var(--text-dim)] text-[9px] uppercase tracking-wide">Saved Results ({savedResults.length})</span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto">
+                    {savedResults.map(sr => (
+                      <div
+                        key={sr.timestamp}
+                        className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] flex items-center justify-between ${
+                          viewingSaved?.timestamp === sr.timestamp ? "bg-[var(--accent-dim)]/15" : ""
+                        }`}
+                        onClick={() => { setViewingSaved(sr); setShowTrades(false); }}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium text-[var(--text-muted)] truncate">{sr.strategyLabel}</div>
+                          <div className="text-[9px] text-[var(--text-dim)] truncate">{sr.filterDescription}</div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 flex-shrink-0">
+                          <span className={`font-mono font-semibold ${sr.totalPnlPoints >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                            {sr.totalPnlPoints >= 0 ? "+" : ""}{sr.totalPnlPoints.toFixed(0)}
+                          </span>
+                          <span className="text-[var(--text-dim)]">{sr.winRate.toFixed(0)}%</span>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDelete(sr.timestamp); }}
+                            className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px]"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Results - fills remaining space */}
+            {presetActiveResult && (
+              <div className="flex-1 min-h-0">
+                <ResultsPanel
+                  result={presetActiveResult}
+                  isViewingSaved={!!viewingSaved}
+                  showTrades={showTrades}
+                  onToggleTrades={() => setShowTrades(t => !t)}
+                  onSave={!viewingSaved && result ? handleSave : undefined}
+                />
               </div>
             )}
           </>
         ) : (
           <>
-            {/* AI Backtest input */}
-            <div>
-              <label className="text-[var(--text-dim)] mb-0.5 block">Describe your strategy idea</label>
-              <textarea
-                value={aiPrompt}
-                onChange={e => setAiPrompt(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    handleGenerateAndRun();
-                  }
-                }}
-                placeholder="e.g. Go long if the 3rd candle closes bullish with a stop of 50 points..."
-                className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)] resize-none"
-                rows={3}
-                disabled={aiLoading}
-              />
-              <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">
-                DeepSeek converts your idea into rules and backtests it. Enter to run.
-              </p>
+            {/* AI Backtest controls */}
+            <div className="flex-shrink-0 space-y-2 mb-2">
+              <div>
+                <label className="text-[var(--text-dim)] mb-0.5 block">Describe your strategy idea</label>
+                <textarea
+                  value={aiPrompt}
+                  onChange={e => setAiPrompt(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleGenerateAndRun();
+                    }
+                  }}
+                  placeholder="e.g. Go long if the 3rd candle closes bullish with a stop of 50 points..."
+                  className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1.5 py-1 text-[10px] text-[var(--text)] resize-none"
+                  rows={2}
+                  disabled={aiLoading}
+                />
+                <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">
+                  DeepSeek converts your idea into rules and backtests it.
+                </p>
+              </div>
+
+              <button
+                onClick={handleGenerateAndRun}
+                disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
+                className="w-full btn-purple py-1.5"
+              >
+                {aiLoading ? (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
+                    Generating & running...
+                  </span>
+                ) : (
+                  `Generate & Backtest (${days.length} days)`
+                )}
+              </button>
+
+              {/* Management parameters */}
+              <details className="border border-[var(--border)] rounded bg-[var(--bg)]">
+                <summary className="px-2 py-1 text-[9px] text-[var(--text-muted)] font-semibold uppercase tracking-wide cursor-pointer select-none hover:text-[var(--text)]">
+                  Management
+                  {(trailMode !== "none" || beMode !== "none") && (
+                    <span className="text-[var(--cyan,var(--accent))] ml-1 normal-case tracking-normal">
+                      {[trailMode !== "none" && "Trail", beMode !== "none" && "BE"].filter(Boolean).join(" + ")}
+                    </span>
+                  )}
+                </summary>
+                <div className="px-2 pb-1.5 space-y-1 border-t border-[var(--border)]">
+                  {/* Trail Stop */}
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 pt-1">
+                    <div>
+                      <label className="text-[var(--text-dim)] block text-[9px]">Trail Stop</label>
+                      <select
+                        value={trailMode}
+                        onChange={e => setTrailMode(e.target.value as "none" | "candle_hl" | "atr")}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
+                      >
+                        <option value="none">None</option>
+                        <option value="candle_hl">Candle H/L</option>
+                        <option value="atr">ATR Trail</option>
+                      </select>
+                    </div>
+                    {trailMode !== "none" && (
+                      <div>
+                        <label className="text-[var(--text-dim)] block text-[9px]">
+                          {trailMode === "candle_hl" ? "Lookback bars" : "ATR ×"}
+                        </label>
+                        <input
+                          type="number"
+                          value={trailValue}
+                          min={trailMode === "candle_hl" ? 1 : 0.1}
+                          max={trailMode === "candle_hl" ? 20 : 10}
+                          step={trailMode === "candle_hl" ? 1 : 0.1}
+                          onChange={e => setTrailValue(Number(e.target.value))}
+                          className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  {/* Break-Even */}
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+                    <div>
+                      <label className="text-[var(--text-dim)] block text-[9px]">Break-Even</label>
+                      <select
+                        value={beMode}
+                        onChange={e => setBeMode(e.target.value as "none" | "points" | "atr" | "rr")}
+                        className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]"
+                      >
+                        <option value="none">None</option>
+                        <option value="points">After X pts</option>
+                        <option value="atr">After X × ATR</option>
+                        <option value="rr">After X R</option>
+                      </select>
+                    </div>
+                    {beMode !== "none" && (
+                      <div>
+                        <label className="text-[var(--text-dim)] block text-[9px]">
+                          {beMode === "points" ? "Points" : beMode === "atr" ? "ATR ×" : "R multiple"}
+                        </label>
+                        <input
+                          type="number"
+                          value={beThreshold}
+                          min={0}
+                          max={beMode === "points" ? 500 : 10}
+                          step={beMode === "points" ? 5 : 0.1}
+                          onChange={e => setBeThreshold(Number(e.target.value))}
+                          className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)] font-mono"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </details>
+
+              {aiError && (
+                <div className="text-[10px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1">
+                  {aiError}
+                </div>
+              )}
+
+              {/* Show generated rules */}
+              {aiStrategy && (
+                <div className="border border-[var(--purple)]/30 rounded bg-[var(--purple)]/5 px-2 py-1.5">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[var(--purple)] font-semibold text-[10px]">{aiStrategy.name}</span>
+                    <button
+                      onClick={handleSaveCustom}
+                      className="text-[var(--purple)] hover:underline text-[9px]"
+                    >
+                      Save
+                    </button>
+                  </div>
+                  <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
+                    <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
+                    <div>
+                      <span className="text-[var(--text-muted)]">Entry:</span>{" "}
+                      {aiStrategy.entryMode === "after_pattern"
+                        ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
+                        : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
+                    </div>
+                    {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
+                      <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
+                    )}
+                    {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
+                      <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
+                    )}
+                    <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
+                    {aiStrategy.conditions.map((c, i) => (
+                      <div key={i} className="pl-2 text-[var(--text-dim)]">
+                        <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
+                        {c.search
+                          ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
+                          : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
+                        {c.value != null ? ` [${c.value}]` : ""}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Specific Backtests (saved custom strategies) */}
+              {customStrategies.length > 0 && (
+                <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
+                  <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
+                    <span className="font-semibold text-[var(--purple)] text-[9px] uppercase tracking-wide">
+                      Specific Backtests ({customStrategies.length})
+                    </span>
+                  </div>
+                  <div className="max-h-24 overflow-y-auto">
+                    {customStrategies.map(cs => (
+                      <div
+                        key={cs.id}
+                        className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] ${
+                          viewingCustom?.id === cs.id ? "bg-[var(--purple)]/10" : ""
+                        }`}
+                        onClick={() => handleRunSavedCustom(cs)}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
+                            <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
+                            <div className="text-[9px] text-[var(--text-dim)]">
+                              {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
+                              {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
+                              {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
+                            </div>
+                          </div>
+                          <button
+                            onClick={e => { e.stopPropagation(); handleDeleteCustom(cs.id); }}
+                            className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px] ml-2"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
-            <button
-              onClick={handleGenerateAndRun}
-              disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
-              className="w-full btn-purple py-1.5"
-            >
-              {aiLoading ? (
-                <span className="flex items-center justify-center gap-1.5">
-                  <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
-                  Generating & running...
-                </span>
-              ) : (
-                `Generate & Backtest (${days.length} days)`
-              )}
-            </button>
-
-            {aiError && (
-              <div className="text-[10px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1">
-                {aiError}
-              </div>
-            )}
-
-            {/* Show generated rules */}
-            {aiStrategy && (
-              <div className="border border-[var(--purple)]/30 rounded bg-[var(--purple)]/5 px-2 py-1.5">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[var(--purple)] font-semibold text-[10px]">{aiStrategy.name}</span>
-                  <button
-                    onClick={handleSaveCustom}
-                    className="text-[var(--purple)] hover:underline text-[9px]"
-                  >
-                    Save
-                  </button>
-                </div>
-                <div className="text-[9px] text-[var(--text-dim)] space-y-0.5">
-                  <div><span className="text-[var(--text-muted)]">Direction:</span> {aiStrategy.direction}</div>
-                  <div>
-                    <span className="text-[var(--text-muted)]">Entry:</span>{" "}
-                    {aiStrategy.entryMode === "after_pattern"
-                      ? `+${aiStrategy.entryOffset ?? 1} bar(s) after pattern (${aiStrategy.entryPrice})`
-                      : `bar ${aiStrategy.entryBar} (${aiStrategy.entryPrice})`}
-                  </div>
-                  {(aiStrategy.stopPoints > 0 || aiStrategy.stopAtr) && (
-                    <div><span className="text-[var(--text-muted)]">Stop:</span> {aiStrategy.stopAtr ? `${aiStrategy.stopAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.stopPoints} pts`}</div>
-                  )}
-                  {(aiStrategy.targetPoints > 0 || aiStrategy.targetAtr) && (
-                    <div><span className="text-[var(--text-muted)]">Target:</span> {aiStrategy.targetAtr ? `${aiStrategy.targetAtr}× ATR(${aiStrategy.atrLength ?? 14})` : `${aiStrategy.targetPoints} pts`}</div>
-                  )}
-                  <div><span className="text-[var(--text-muted)]">Conditions:</span></div>
-                  {aiStrategy.conditions.map((c, i) => (
-                    <div key={i} className="pl-2 text-[var(--text-dim)]">
-                      <span className="text-[var(--text-muted)]">{c.type.replace(/_/g, " ")}</span>
-                      {c.search
-                        ? ` — find #${c.search.occurrence ?? 1} in bars ${c.search.fromBar ?? 0}-${c.search.toBar ?? 77}`
-                        : c.barIndex != null ? ` (bar ${c.barIndex})` : ""}
-                      {c.value != null ? ` [${c.value}]` : ""}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* AI results */}
+            {/* AI results - fills remaining space */}
             {aiResult && (
-              <ResultsPanel
-                result={aiResult}
-                isViewingSaved={false}
-                showTrades={showAiTrades}
-                onToggleTrades={() => setShowAiTrades(t => !t)}
-              />
-            )}
-
-            {/* Specific Backtests (saved custom strategies) */}
-            {customStrategies.length > 0 && (
-              <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-                <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)]">
-                  <span className="font-semibold text-[var(--purple)] text-[9px] uppercase tracking-wide">
-                    Specific Backtests ({customStrategies.length})
-                  </span>
-                </div>
-                <div className="max-h-48 overflow-y-auto">
-                  {customStrategies.map(cs => (
-                    <div
-                      key={cs.id}
-                      className={`px-2 py-1 border-b border-[var(--border)] cursor-pointer hover:bg-[var(--surface-hover)] ${
-                        viewingCustom?.id === cs.id ? "bg-[var(--purple)]/10" : ""
-                      }`}
-                      onClick={() => handleRunSavedCustom(cs)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-[var(--text-muted)] truncate">{cs.name}</div>
-                          <div className="text-[9px] text-[var(--text-dim)] truncate italic">{cs.description}</div>
-                          <div className="text-[9px] text-[var(--text-dim)]">
-                            {cs.direction} | {cs.entryMode === "after_pattern" ? `+${cs.entryOffset ?? 1} after pattern` : `bar ${cs.entryBar}`} | {cs.conditions.length} rules
-                            {cs.stopPoints > 0 ? ` | SL ${cs.stopPoints}` : ""}
-                            {cs.targetPoints > 0 ? ` | TP ${cs.targetPoints}` : ""}
-                          </div>
-                        </div>
-                        <button
-                          onClick={e => { e.stopPropagation(); handleDeleteCustom(cs.id); }}
-                          className="text-[var(--red)] opacity-40 hover:opacity-100 text-[9px] ml-2"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex-1 min-h-0">
+                <ResultsPanel
+                  result={aiResult}
+                  isViewingSaved={false}
+                  showTrades={showAiTrades}
+                  onToggleTrades={() => setShowAiTrades(t => !t)}
+                />
               </div>
             )}
           </>
@@ -473,6 +576,34 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
       </div>
     </div>
   );
+}
+
+// ── R:R helpers ──
+function hasRisk(trades: TradeResult[]): boolean {
+  return trades.some(t => t.riskPoints && t.riskPoints > 0);
+}
+
+function toRR(pnl: number, risk: number): number {
+  return risk > 0 ? pnl / risk : 0;
+}
+
+function computeRRStats(trades: TradeResult[]) {
+  const rr = trades.filter(t => t.riskPoints && t.riskPoints > 0).map(t => toRR(t.pnlPoints, t.riskPoints!));
+  if (rr.length === 0) return null;
+  const wins = rr.filter(v => v > 0);
+  const losses = rr.filter(v => v <= 0);
+  const sorted = [...rr].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  return {
+    avg: rr.reduce((a, b) => a + b, 0) / rr.length,
+    total: rr.reduce((a, b) => a + b, 0),
+    median,
+    avgWin: wins.length > 0 ? wins.reduce((a, b) => a + b, 0) / wins.length : 0,
+    avgLoss: losses.length > 0 ? Math.abs(losses.reduce((a, b) => a + b, 0) / losses.length) : 0,
+    maxWin: rr.length > 0 ? Math.max(...rr) : 0,
+    maxLoss: rr.length > 0 ? Math.min(...rr) : 0,
+  };
 }
 
 // ── Shared results panel ──
@@ -489,13 +620,31 @@ function ResultsPanel({
   onToggleTrades: () => void;
   onSave?: () => void;
 }) {
+  const [displayMode, setDisplayMode] = useState<"pts" | "rr">("pts");
+  const canShowRR = hasRisk(result.trades);
+  const rrStats = displayMode === "rr" ? computeRRStats(result.trades) : null;
+
+  const fmt = (v: number, prefix = true) => `${prefix && v >= 0 ? "+" : ""}${v.toFixed(displayMode === "rr" ? 2 : 1)}${displayMode === "rr" ? "R" : ""}`;
+
   return (
-    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
+    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in h-full">
       <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
-        <span className="font-semibold text-[var(--text-secondary)] text-[10px]">
+        <span className="font-semibold text-[var(--text-secondary)] text-[10px] truncate">
           {isViewingSaved ? "Saved" : "Results"}: {result.strategyLabel}
         </span>
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center flex-shrink-0">
+          {canShowRR && (
+            <button
+              onClick={() => setDisplayMode(m => m === "pts" ? "rr" : "pts")}
+              className={`text-[8px] px-1.5 py-0.5 rounded border transition-all ${
+                displayMode === "rr"
+                  ? "border-[var(--cyan,var(--accent))] text-[var(--cyan,var(--accent))] bg-[var(--cyan,var(--accent))]/10"
+                  : "border-[var(--border)] text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+              }`}
+            >
+              R:R
+            </button>
+          )}
           {onSave && (
             <button onClick={onSave} className="text-[var(--accent)] hover:underline text-[9px]">Save</button>
           )}
@@ -505,38 +654,50 @@ function ResultsPanel({
         </div>
       </div>
 
-      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0">
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Trades" value={String(result.totalTrades)} />
-          <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
-          <StatBox label="Avg P&L" value={`${result.avgPnlPoints >= 0 ? "+" : ""}${result.avgPnlPoints.toFixed(1)} pts`} color={result.avgPnlPoints >= 0 ? "g" : "r"} />
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Total P&L" value={`${result.totalPnlPoints >= 0 ? "+" : ""}${result.totalPnlPoints.toFixed(1)}`} color={result.totalPnlPoints >= 0 ? "g" : "r"} />
-          <StatBox label="Profit Factor" value={result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)} color={result.profitFactor >= 1 ? "g" : "r"} />
-          <StatBox label="Median" value={`${result.medianPnlPoints >= 0 ? "+" : ""}${result.medianPnlPoints.toFixed(1)}`} color={result.medianPnlPoints >= 0 ? "g" : "r"} />
-        </div>
-        <div className="grid grid-cols-4 gap-1">
-          <StatBox label="Avg Win" value={`+${result.avgWin.toFixed(1)}`} color="g" />
-          <StatBox label="Avg Loss" value={`-${result.avgLoss.toFixed(1)}`} color="r" />
-          <StatBox label="Max Win" value={`+${result.maxWin.toFixed(1)}`} color="g" />
-          <StatBox label="Max Loss" value={result.maxLoss.toFixed(1)} color="r" />
-        </div>
-        <div className="grid grid-cols-3 gap-1">
-          <StatBox label="Winners" value={String(result.winners)} color="g" />
-          <StatBox label="Losers" value={String(result.losers)} color="r" />
-          <StatBox label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
-        </div>
+      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
+        <div className="flex-shrink-0 space-y-1">
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label="Trades" value={String(result.totalTrades)} />
+            <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
+            <StatBox label={displayMode === "rr" ? "Avg R:R" : "Avg P&L"}
+              value={displayMode === "rr" && rrStats ? fmt(rrStats.avg) : fmt(result.avgPnlPoints) + (displayMode === "pts" ? " pts" : "")}
+              color={(displayMode === "rr" && rrStats ? rrStats.avg : result.avgPnlPoints) >= 0 ? "g" : "r"} />
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label={displayMode === "rr" ? "Total R" : "Total P&L"}
+              value={displayMode === "rr" && rrStats ? fmt(rrStats.total) : fmt(result.totalPnlPoints)}
+              color={(displayMode === "rr" && rrStats ? rrStats.total : result.totalPnlPoints) >= 0 ? "g" : "r"} />
+            <StatBox label="Profit Factor" value={result.profitFactor === Infinity ? "∞" : result.profitFactor.toFixed(2)} color={result.profitFactor >= 1 ? "g" : "r"} />
+            <StatBox label="Median"
+              value={displayMode === "rr" && rrStats ? fmt(rrStats.median) : fmt(result.medianPnlPoints)}
+              color={(displayMode === "rr" && rrStats ? rrStats.median : result.medianPnlPoints) >= 0 ? "g" : "r"} />
+          </div>
+          <div className="grid grid-cols-4 gap-1">
+            <StatBox label="Avg Win"
+              value={displayMode === "rr" && rrStats ? `+${rrStats.avgWin.toFixed(2)}R` : `+${result.avgWin.toFixed(1)}`} color="g" />
+            <StatBox label="Avg Loss"
+              value={displayMode === "rr" && rrStats ? `-${rrStats.avgLoss.toFixed(2)}R` : `-${result.avgLoss.toFixed(1)}`} color="r" />
+            <StatBox label="Max Win"
+              value={displayMode === "rr" && rrStats ? `+${rrStats.maxWin.toFixed(2)}R` : `+${result.maxWin.toFixed(1)}`} color="g" />
+            <StatBox label="Max Loss"
+              value={displayMode === "rr" && rrStats ? `${rrStats.maxLoss.toFixed(2)}R` : result.maxLoss.toFixed(1)} color="r" />
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            <StatBox label="Winners" value={String(result.winners)} color="g" />
+            <StatBox label="Losers" value={String(result.losers)} color="r" />
+            <StatBox label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
+          </div>
 
-        <div className="text-[9px] text-[var(--text-dim)] pt-1 border-t border-[var(--border)]">
-          Filter: {result.filterDescription} ({result.totalDays} days)
+          <div className="text-[9px] text-[var(--text-dim)] pt-1 border-t border-[var(--border)]">
+            Filter: {result.filterDescription} ({result.totalDays} days)
+          </div>
         </div>
 
         {/* Equity Curve */}
-        {result.trades.length >= 2 && <EquityCurve trades={result.trades} />}
+        {result.trades.length >= 2 && <EquityCurve trades={result.trades} displayMode={displayMode} />}
 
         {showTrades && (
-          <div className="max-h-40 overflow-y-auto border-t border-[var(--border)] mt-1">
+          <div className="max-h-40 overflow-y-auto border-t border-[var(--border)] mt-1 flex-shrink-0">
             <table className="w-full text-[9px]">
               <thead className="sticky top-0 bg-[var(--surface-2)]">
                 <tr>
@@ -544,27 +705,33 @@ function ResultsPanel({
                   <th className="text-center px-1 py-0.5 text-[var(--text-dim)]">Dir</th>
                   <th className="text-right px-1 py-0.5 text-[var(--text-dim)]">Entry</th>
                   <th className="text-right px-1 py-0.5 text-[var(--text-dim)]">Exit</th>
-                  <th className="text-right px-1 py-0.5 text-[var(--text-dim)]">P&L</th>
+                  <th className="text-right px-1 py-0.5 text-[var(--text-dim)]">{displayMode === "rr" ? "R:R" : "P&L"}</th>
                   <th className="text-center px-1 py-0.5 text-[var(--text-dim)]">Out</th>
                 </tr>
               </thead>
               <tbody>
-                {result.trades.map((t, i) => (
-                  <tr key={i} className="border-b border-[var(--border)]">
-                    <td className="px-1 py-0.5 font-mono text-[var(--text-muted)]">{t.date.slice(5)}</td>
-                    <td className={`px-1 py-0.5 text-center ${t.direction === "long" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-                      {t.direction === "long" ? "L" : "S"}
-                    </td>
-                    <td className="px-1 py-0.5 text-right font-mono">{t.entryPrice.toFixed(1)}</td>
-                    <td className="px-1 py-0.5 text-right font-mono">{t.exitPrice.toFixed(1)}</td>
-                    <td className={`px-1 py-0.5 text-right font-mono font-medium ${t.pnlPoints >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-                      {t.pnlPoints >= 0 ? "+" : ""}{t.pnlPoints.toFixed(1)}
-                    </td>
-                    <td className="px-1 py-0.5 text-center text-[var(--text-dim)]">
-                      {t.hitTarget ? "T" : t.hitStop ? "S" : "C"}
-                    </td>
-                  </tr>
-                ))}
+                {result.trades.map((t, i) => {
+                  const pnlDisplay = displayMode === "rr" && t.riskPoints && t.riskPoints > 0
+                    ? toRR(t.pnlPoints, t.riskPoints)
+                    : t.pnlPoints;
+                  const suffix = displayMode === "rr" && t.riskPoints && t.riskPoints > 0 ? "R" : "";
+                  return (
+                    <tr key={i} className="border-b border-[var(--border)]">
+                      <td className="px-1 py-0.5 font-mono text-[var(--text-muted)]">{t.date.slice(5)}</td>
+                      <td className={`px-1 py-0.5 text-center ${t.direction === "long" ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                        {t.direction === "long" ? "L" : "S"}
+                      </td>
+                      <td className="px-1 py-0.5 text-right font-mono">{t.entryPrice.toFixed(1)}</td>
+                      <td className="px-1 py-0.5 text-right font-mono">{t.exitPrice.toFixed(1)}</td>
+                      <td className={`px-1 py-0.5 text-right font-mono font-medium ${pnlDisplay >= 0 ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+                        {pnlDisplay >= 0 ? "+" : ""}{pnlDisplay.toFixed(displayMode === "rr" ? 2 : 1)}{suffix}
+                      </td>
+                      <td className="px-1 py-0.5 text-center text-[var(--text-dim)]">
+                        {t.hitTarget ? "T" : t.hitStop ? "S" : "C"}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -574,8 +741,8 @@ function ResultsPanel({
   );
 }
 
-// ── Equity Curve (cumulative P&L in points) — expanded to fill remaining space ──
-function EquityCurve({ trades }: { trades: TradeResult[] }) {
+// ── Equity Curve (cumulative P&L in points or R:R) — expanded to fill remaining space ──
+function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; displayMode?: "pts" | "rr" }) {
   const W = 320;
   const H = 200;
   const PAD_X = 36;
@@ -588,9 +755,13 @@ function EquityCurve({ trades }: { trades: TradeResult[] }) {
   const cumulative: number[] = [0];
   let running = 0;
   for (const t of trades) {
-    running += t.pnlPoints;
+    const val = displayMode === "rr" && t.riskPoints && t.riskPoints > 0
+      ? toRR(t.pnlPoints, t.riskPoints)
+      : t.pnlPoints;
+    running += val;
     cumulative.push(running);
   }
+  const unit = displayMode === "rr" ? "R" : "pts";
 
   const minVal = Math.min(...cumulative);
   const maxVal = Math.max(...cumulative);
@@ -645,11 +816,11 @@ function EquityCurve({ trades }: { trades: TradeResult[] }) {
             MaxDD <span className="font-[JetBrains_Mono,monospace] text-[var(--red)]">-{maxDd.toFixed(0)}</span>
           </span>
           <span className={`text-[10px] font-[JetBrains_Mono,monospace] font-bold ${isPositive ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-            {isPositive ? "+" : ""}{finalVal.toFixed(1)} pts
+            {isPositive ? "+" : ""}{finalVal.toFixed(displayMode === "rr" ? 2 : 1)} {unit}
           </span>
         </div>
       </div>
-      <div className="flex-1 min-h-[140px]">
+      <div className="flex-1 min-h-0">
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
           <defs>
             <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">

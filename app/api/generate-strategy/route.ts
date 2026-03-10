@@ -23,7 +23,11 @@ OUTPUT FORMAT — JSON only, no explanation:
   "targetAtr": N,
   "atrLength": N,
   "holdToClose": bool,
-  "maxHoldBars": N
+  "maxHoldBars": N,
+  "trailMode": "none"|"candle_hl"|"atr",
+  "trailValue": N,
+  "beMode": "none"|"points"|"atr"|"rr",
+  "beThreshold": N
 }
 
 TWO MODES:
@@ -133,6 +137,14 @@ Time: time_after (value=bar#), time_before (value=bar#)
 
 Structure: consolidation (value=N bars)
 
+MANAGEMENT:
+- trailMode: "candle_hl" (trail stop to low/high of last N candles), "atr" (trail to close ± ATR*X)
+- trailValue: N for candle_hl lookback, or ATR multiplier for atr trail
+- beMode: "points" (move stop to entry after X pts profit), "atr" (after X*ATR), "rr" (after X*risk)
+- beThreshold: the trigger value
+
+Default trailMode/beMode to "none" if user doesn't mention trailing or break-even.
+
 ONLY output JSON.`;
 
 // ── Pattern types that should use dynamic search when no barIndex given ──
@@ -189,6 +201,8 @@ function fixStrategy(parsed: Record<string, unknown>): Record<string, unknown> {
   if (parsed.stopPoints == null) parsed.stopPoints = 0;
   if (parsed.targetPoints == null) parsed.targetPoints = 0;
   if (parsed.holdToClose == null) parsed.holdToClose = true;
+  if (!parsed.trailMode) parsed.trailMode = "none";
+  if (!parsed.beMode) parsed.beMode = "none";
 
   return parsed;
 }

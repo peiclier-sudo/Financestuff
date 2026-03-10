@@ -100,6 +100,11 @@ export interface CustomStrategyDef {
   atrLength?: number;   // lookback for ATR calculation (default 14)
   holdToClose: boolean;
   maxHoldBars?: number;
+  // ── Trade management ──
+  trailMode?: "none" | "candle_hl" | "atr";
+  trailValue?: number;  // candle_hl: N candles lookback; atr: ATR multiplier
+  beMode?: "none" | "points" | "atr" | "rr";
+  beThreshold?: number; // points, ATR multiplier, or R multiple to trigger BE
   timestamp: number;
 }
 
@@ -529,15 +534,14 @@ export function runCustomStrategy(
     const dir = strategy.direction;
 
     // Compute stop/target — ATR-based or fixed
-    let stopPts = strategy.stopPoints;
+    const atrAtEntry = computeATR(bars, Math.max(ei - 1, 1), strategy.atrLength ?? 14);
+    let initialStopPts = strategy.stopPoints;
     let targetPts = strategy.targetPoints;
     if (strategy.stopAtr && strategy.stopAtr > 0) {
-      const atr = computeATR(bars, Math.max(ei - 1, 1), strategy.atrLength ?? 14);
-      stopPts = strategy.stopAtr * atr;
+      initialStopPts = strategy.stopAtr * atrAtEntry;
     }
     if (strategy.targetAtr && strategy.targetAtr > 0) {
-      const atr = computeATR(bars, Math.max(ei - 1, 1), strategy.atrLength ?? 14);
-      targetPts = strategy.targetAtr * atr;
+      targetPts = strategy.targetAtr * atrAtEntry;
     }
 
     // Determine max hold
@@ -548,7 +552,13 @@ export function runCustomStrategy(
       maxHold = strategy.maxHoldBars ?? (bars.length - ei);
     }
 
-    // Simulate trade
+    // Management settings
+    const trailMode = strategy.trailMode ?? "none";
+    const trailValue = strategy.trailValue ?? 1;
+    const beMode = strategy.beMode ?? "none";
+    const beThreshold = strategy.beThreshold ?? 0;
+
+    // Simulate trade with management
     let exitPrice = entryPrice;
     let exitTime = bars[ei].time;
     let hitTarget = false;
@@ -556,18 +566,87 @@ export function runCustomStrategy(
     let timedOut = false;
     let holdBars = 0;
 
+    // Current (live) stop level — starts at initial stop
+    let currentStopPts = initialStopPts;
+    let beTriggered = false;
+
     const maxIdx = Math.min(ei + maxHold, bars.length - 1);
 
     for (let i = ei; i <= maxIdx; i++) {
       const b = bars[i];
       holdBars = i - ei;
 
+      // ── Break-even check (at bar close, before stop check on next bar) ──
+      if (!beTriggered && beMode !== "none" && initialStopPts > 0 && i > ei) {
+        const unrealised = dir === "long" ? b.close - entryPrice : entryPrice - b.close;
+        let beTarget = 0;
+        if (beMode === "points") beTarget = beThreshold;
+        else if (beMode === "atr") beTarget = beThreshold * atrAtEntry;
+        else if (beMode === "rr") beTarget = beThreshold * initialStopPts;
+
+        if (unrealised >= beTarget) {
+          // Move stop to entry (break-even)
+          currentStopPts = 0; // stop at entry = 0 distance
+          beTriggered = true;
+        }
+      }
+
+      // ── Trail stop update (at close of each completed bar, not on entry bar) ──
+      if (trailMode !== "none" && i > ei) {
+        if (trailMode === "candle_hl") {
+          // Trail to the worst price of last N candles
+          const lookback = Math.max(1, Math.floor(trailValue));
+          const fromIdx = Math.max(ei, i - lookback);
+          if (dir === "long") {
+            let trailLow = Infinity;
+            for (let k = fromIdx; k <= i; k++) trailLow = Math.min(trailLow, bars[k].low);
+            const trailDist = entryPrice - trailLow;
+            if (trailDist >= 0 && (currentStopPts <= 0 || trailDist < currentStopPts)) {
+              currentStopPts = trailDist;
+            }
+          } else {
+            let trailHigh = -Infinity;
+            for (let k = fromIdx; k <= i; k++) trailHigh = Math.max(trailHigh, bars[k].high);
+            const trailDist = trailHigh - entryPrice;
+            if (trailDist >= 0 && (currentStopPts <= 0 || trailDist < currentStopPts)) {
+              currentStopPts = trailDist;
+            }
+          }
+        } else if (trailMode === "atr") {
+          // Trail to close - ATR*X (recalculated at each bar)
+          const liveAtr = computeATR(bars, i, strategy.atrLength ?? 14);
+          const trailDist = trailValue * liveAtr;
+          if (dir === "long") {
+            const trailLevel = b.close - trailDist;
+            const newDist = entryPrice - trailLevel;
+            if (trailLevel > entryPrice) {
+              // Trail is above entry — use it (distance becomes negative = protective)
+              currentStopPts = -(trailLevel - entryPrice);
+            } else if (newDist >= 0 && (currentStopPts <= 0 || newDist < currentStopPts)) {
+              currentStopPts = newDist;
+            }
+          } else {
+            const trailLevel = b.close + trailDist;
+            const newDist = trailLevel - entryPrice;
+            if (trailLevel < entryPrice) {
+              currentStopPts = -(entryPrice - trailLevel);
+            } else if (newDist >= 0 && (currentStopPts <= 0 || newDist < currentStopPts)) {
+              currentStopPts = newDist;
+            }
+          }
+        }
+      }
+
+      // ── Stop check ──
       if (dir === "long") {
-        if (stopPts > 0 && b.low <= entryPrice - stopPts) {
-          exitPrice = entryPrice - stopPts;
-          exitTime = b.time;
-          hitStop = true;
-          break;
+        if (currentStopPts !== 0) {
+          const stopLevel = entryPrice - currentStopPts;
+          if (b.low <= stopLevel) {
+            exitPrice = stopLevel;
+            exitTime = b.time;
+            hitStop = true;
+            break;
+          }
         }
         if (targetPts > 0 && b.high >= entryPrice + targetPts) {
           exitPrice = entryPrice + targetPts;
@@ -576,11 +655,14 @@ export function runCustomStrategy(
           break;
         }
       } else {
-        if (stopPts > 0 && b.high >= entryPrice + stopPts) {
-          exitPrice = entryPrice + stopPts;
-          exitTime = b.time;
-          hitStop = true;
-          break;
+        if (currentStopPts !== 0) {
+          const stopLevel = entryPrice + currentStopPts;
+          if (b.high >= stopLevel) {
+            exitPrice = stopLevel;
+            exitTime = b.time;
+            hitStop = true;
+            break;
+          }
         }
         if (targetPts > 0 && b.low <= entryPrice - targetPts) {
           exitPrice = entryPrice - targetPts;
@@ -603,8 +685,8 @@ export function runCustomStrategy(
 
     let stopPrice: number | null = null;
     let targetPrice: number | null = null;
-    if (stopPts > 0) {
-      stopPrice = dir === "long" ? entryPrice - stopPts : entryPrice + stopPts;
+    if (initialStopPts > 0) {
+      stopPrice = dir === "long" ? entryPrice - initialStopPts : entryPrice + initialStopPts;
     }
     if (targetPts > 0) {
       targetPrice = dir === "long" ? entryPrice + targetPts : entryPrice - targetPts;
@@ -625,6 +707,7 @@ export function runCustomStrategy(
       hitTarget,
       hitStop,
       timedOut,
+      riskPoints: initialStopPts > 0 ? initialStopPts : undefined,
     });
   }
 
