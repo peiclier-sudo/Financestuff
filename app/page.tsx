@@ -172,16 +172,22 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex flex-col p-2 gap-2 overflow-hidden">
+    <div className="h-screen flex flex-col p-3 gap-2 overflow-hidden">
       {/* Header */}
       <header className="flex items-center justify-between px-1 flex-shrink-0">
-        <div className="flex items-center gap-3">
-          <h1 className="text-sm font-bold tracking-tight">NDX Day Filter</h1>
-          <span className="text-[10px] text-[var(--text-dim)] font-mono">
-            {allDays[0]?.date} → {allDays[allDays.length - 1]?.date}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
+            <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-[var(--text)] to-[var(--text-secondary)] bg-clip-text text-transparent">NDX Day Filter</h1>
+          </div>
+          <span className="text-[10px] text-[var(--text-dim)] font-[JetBrains_Mono,monospace] bg-[var(--surface)] px-2 py-0.5 rounded-full border border-[var(--border)]">
+            {allDays[0]?.date} — {allDays[allDays.length - 1]?.date}
           </span>
         </div>
-        <span className="text-[10px] text-[var(--text-dim)]">↑↓ navigate | Ctrl+click multi-select</span>
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] text-[var(--text-dim)] tracking-wide uppercase">↑↓ nav</span>
+          <span className="text-[9px] text-[var(--text-dim)] tracking-wide uppercase">ctrl+click multi</span>
+        </div>
       </header>
 
       {/* Filters */}
@@ -203,7 +209,7 @@ export default function Home() {
       {/* Main content: 3 columns */}
       <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
         {/* Left: Summary on top, day list below */}
-        <div className="col-span-3 flex flex-col gap-1 min-h-0">
+        <div className="col-span-3 flex flex-col gap-2 min-h-0">
           {selectedDayObjects.length > 0 && (
             <div className="flex-shrink-0">
               <DaySummary days={selectedDayObjects} />
@@ -225,9 +231,12 @@ export default function Home() {
               trade={tradeForDay}
             />
           ) : (
-            <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full">
-              <div className="text-center">
-                <p className="text-[var(--text-dim)] text-xs mb-1">Select a day</p>
+            <div className="glass-panel flex items-center justify-center h-full">
+              <div className="text-center fade-in">
+                <div className="w-8 h-8 rounded-full border border-[var(--border-bright)] flex items-center justify-center mx-auto mb-3">
+                  <div className="w-3 h-3 rounded-sm border-2 border-[var(--text-dim)]" />
+                </div>
+                <p className="text-[var(--text-muted)] text-xs mb-1">Select a day</p>
                 <p className="text-[var(--text-dim)] text-[10px]">Click a row or use arrow keys</p>
               </div>
             </div>
@@ -236,24 +245,16 @@ export default function Home() {
 
         {/* Right: Tabbed panel */}
         <div className="col-span-3 min-h-0 flex flex-col">
-          <div className="flex bg-[var(--surface)] border border-b-0 border-[var(--border)] rounded-t-lg overflow-hidden flex-shrink-0">
+          <div className="flex glass-panel rounded-b-none border-b-0 overflow-hidden flex-shrink-0">
             <button
               onClick={() => setRightTab("strategy")}
-              className={`flex-1 text-[10px] py-1 font-semibold tracking-wide transition-colors ${
-                rightTab === "strategy"
-                  ? "bg-[var(--surface-2)] text-[var(--accent)] border-b-2 border-[var(--accent)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-              }`}
+              className={`tab-btn ${rightTab === "strategy" ? "active" : ""}`}
             >
               Strategy Lab
             </button>
             <button
               onClick={() => setRightTab("ai")}
-              className={`flex-1 text-[10px] py-1 font-semibold tracking-wide transition-colors ${
-                rightTab === "ai"
-                  ? "bg-[var(--surface-2)] text-[var(--accent)] border-b-2 border-[var(--accent)]"
-                  : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-              }`}
+              className={`tab-btn ${rightTab === "ai" ? "active" : ""}`}
             >
               AI Analysis
             </button>

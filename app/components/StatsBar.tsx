@@ -23,7 +23,7 @@ export default function StatsBar({ stats }: Props) {
   if (!stats) return null;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg px-3 py-2">
+    <div className="glass-panel-sm px-3 py-2">
       <div className="flex items-center gap-4 flex-wrap text-[11px]">
         <Stat label="Bull/Bear" value={`${stats.bullishCount}/${stats.bearishCount}`}>
           <span className={stats.bullishPct > 50 ? "text-[var(--green)]" : "text-[var(--red)]"}>
@@ -71,8 +71,8 @@ export default function StatsBar({ stats }: Props) {
 function Stat({ label, value, children }: { label: string; value?: string; children?: React.ReactNode }) {
   return (
     <div className="flex items-center gap-1.5">
-      <span className="text-[var(--text-dim)]">{label}</span>
-      <span className="font-mono font-medium">{children ?? value}</span>
+      <span className="text-[var(--text-dim)] text-[10px] uppercase tracking-wide">{label}</span>
+      <span className="font-[JetBrains_Mono,monospace] font-medium text-[11px]">{children ?? value}</span>
     </div>
   );
 }

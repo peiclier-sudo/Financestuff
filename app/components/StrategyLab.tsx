@@ -218,27 +218,13 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
 
   // ── Render ──
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+    <div className="glass-panel overflow-hidden flex flex-col h-full rounded-t-none border-t-0">
       {/* Tab header */}
       <div className="flex border-b border-[var(--border)] flex-shrink-0">
-        <button
-          onClick={() => setTab("preset")}
-          className={`flex-1 text-[9px] py-1 font-semibold tracking-wide transition-colors ${
-            tab === "preset"
-              ? "bg-[var(--surface-2)] text-[var(--accent)] border-b-2 border-[var(--accent)]"
-              : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-          }`}
-        >
+        <button onClick={() => setTab("preset")} className={`tab-btn ${tab === "preset" ? "active" : ""}`}>
           Strategies
         </button>
-        <button
-          onClick={() => setTab("ai")}
-          className={`flex-1 text-[9px] py-1 font-semibold tracking-wide transition-colors ${
-            tab === "ai"
-              ? "bg-[var(--surface-2)] text-[var(--purple)] border-b-2 border-[var(--purple)]"
-              : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-          }`}
-        >
+        <button onClick={() => setTab("ai")} className={`tab-btn ${tab === "ai" ? "active-purple" : ""}`}>
           AI Backtest
         </button>
       </div>
@@ -295,7 +281,7 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
             <button
               onClick={handleRun}
               disabled={running || days.length === 0}
-              className="w-full bg-[var(--accent)] text-white rounded py-1 text-[10px] font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="w-full btn-primary py-1.5"
             >
               {running ? "Running..." : "Run Backtest"}
             </button>
@@ -375,7 +361,7 @@ export default function StrategyLab({ days, filterDescription, onResult }: Props
             <button
               onClick={handleGenerateAndRun}
               disabled={aiLoading || !aiPrompt.trim() || days.length === 0}
-              className="w-full bg-[var(--purple)] text-white rounded py-1 text-[10px] font-semibold hover:opacity-90 disabled:opacity-40 transition-opacity"
+              className="w-full btn-purple py-1.5"
             >
               {aiLoading ? (
                 <span className="flex items-center justify-center gap-1.5">
@@ -504,9 +490,9 @@ function ResultsPanel({
   onSave?: () => void;
 }) {
   return (
-    <div className="border border-[var(--border)] rounded bg-[var(--bg)] overflow-hidden">
-      <div className="px-2 py-1 bg-[var(--surface-2)] border-b border-[var(--border)] flex items-center justify-between">
-        <span className="font-semibold text-[var(--text-muted)]">
+    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
+      <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
+        <span className="font-semibold text-[var(--text-secondary)] text-[10px]">
           {isViewingSaved ? "Saved" : "Results"}: {result.strategyLabel}
         </span>
         <div className="flex gap-1">
@@ -519,7 +505,7 @@ function ResultsPanel({
         </div>
       </div>
 
-      <div className="p-2 space-y-1">
+      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0">
         <div className="grid grid-cols-3 gap-1">
           <StatBox label="Trades" value={String(result.totalTrades)} />
           <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
@@ -588,14 +574,15 @@ function ResultsPanel({
   );
 }
 
-// ── Equity Curve (cumulative P&L in points) ──
+// ── Equity Curve (cumulative P&L in points) — expanded to fill remaining space ──
 function EquityCurve({ trades }: { trades: TradeResult[] }) {
-  const W = 280;
-  const H = 80;
-  const PAD_X = 32;
-  const PAD_Y = 8;
-  const plotW = W - PAD_X - 4;
-  const plotH = H - PAD_Y * 2;
+  const W = 320;
+  const H = 200;
+  const PAD_X = 36;
+  const PAD_Y = 12;
+  const PAD_BOTTOM = 20;
+  const plotW = W - PAD_X - 8;
+  const plotH = H - PAD_Y - PAD_BOTTOM;
 
   // Build cumulative series
   const cumulative: number[] = [0];
@@ -615,74 +602,108 @@ function EquityCurve({ trades }: { trades: TradeResult[] }) {
   // Build the line path
   const linePath = cumulative.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
 
-  // Fill area under the curve (gradient from line to bottom)
+  // Fill area: gradient from line down to zero line (or bottom)
+  const zeroClampY = Math.min(toY(0), PAD_Y + plotH);
   const fillPath = linePath
-    + ` L${toX(cumulative.length - 1).toFixed(1)},${toY(0).toFixed(1)}`
-    + ` L${toX(0).toFixed(1)},${toY(0).toFixed(1)} Z`;
+    + ` L${toX(cumulative.length - 1).toFixed(1)},${zeroClampY.toFixed(1)}`
+    + ` L${toX(0).toFixed(1)},${zeroClampY.toFixed(1)} Z`;
 
   const finalVal = cumulative[cumulative.length - 1];
   const isPositive = finalVal >= 0;
   const lineColor = isPositive ? "var(--green)" : "var(--red)";
+  const fillId = `eqFill_${isPositive ? "g" : "r"}`;
 
-  // Axis labels
   const zeroY = toY(0);
   const showZeroLine = minVal < 0 && maxVal > 0;
 
+  // Compute horizontal grid lines (3 levels)
+  const midVal = (maxVal + minVal) / 2;
+  const gridLines = [
+    { y: toY(maxVal), label: `${maxVal >= 0 ? "+" : ""}${maxVal.toFixed(0)}` },
+    { y: toY(midVal), label: `${midVal >= 0 ? "+" : ""}${midVal.toFixed(0)}` },
+    { y: toY(minVal), label: `${minVal >= 0 ? "+" : ""}${minVal.toFixed(0)}` },
+  ];
+
+  // Drawdown from peak
+  let peak = 0;
+  let maxDd = 0;
+  for (const v of cumulative) {
+    if (v > peak) peak = v;
+    const dd = peak - v;
+    if (dd > maxDd) maxDd = dd;
+  }
+
   return (
-    <div className="border-t border-[var(--border)] pt-1 mt-1">
-      <div className="flex items-center justify-between mb-0.5">
-        <span className="text-[8px] text-[var(--text-dim)] uppercase tracking-wide">Equity Curve (pts)</span>
-        <span className={`text-[9px] font-mono font-semibold ${isPositive ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
-          {isPositive ? "+" : ""}{finalVal.toFixed(1)}
-        </span>
+    <div className="border-t border-[var(--border)] pt-2 mt-2 flex-1 flex flex-col min-h-0">
+      <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center gap-2">
+          <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">Equity Curve</span>
+          <span className="text-[9px] text-[var(--text-dim)]">{trades.length} trades</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-[9px] text-[var(--text-dim)]">
+            MaxDD <span className="font-[JetBrains_Mono,monospace] text-[var(--red)]">-{maxDd.toFixed(0)}</span>
+          </span>
+          <span className={`text-[10px] font-[JetBrains_Mono,monospace] font-bold ${isPositive ? "text-[var(--green)]" : "text-[var(--red)]"}`}>
+            {isPositive ? "+" : ""}{finalVal.toFixed(1)} pts
+          </span>
+        </div>
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 80 }}>
-        <defs>
-          <linearGradient id="eqFillGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={lineColor} stopOpacity="0.25" />
-            <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
-          </linearGradient>
-        </defs>
+      <div className="flex-1 min-h-[140px]">
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id={fillId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity="0.2" />
+              <stop offset="80%" stopColor={lineColor} stopOpacity="0.03" />
+              <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+            </linearGradient>
+          </defs>
 
-        {/* Zero line */}
-        {showZeroLine && (
-          <line
-            x1={PAD_X} y1={zeroY} x2={W - 4} y2={zeroY}
-            stroke="var(--text-dim)" strokeWidth="0.5" strokeDasharray="3,3" opacity="0.4"
-          />
-        )}
+          {/* Grid lines */}
+          {gridLines.map((gl, i) => (
+            <g key={i}>
+              <line x1={PAD_X} y1={gl.y} x2={W - 8} y2={gl.y}
+                stroke="var(--border)" strokeWidth="0.5" opacity="0.5" />
+              <text x={PAD_X - 3} y={gl.y + 3} textAnchor="end"
+                fontSize="7" fill="var(--text-dim)" fontFamily="JetBrains Mono, monospace" opacity="0.7">
+                {gl.label}
+              </text>
+            </g>
+          ))}
 
-        {/* Fill under curve */}
-        <path d={fillPath} fill="url(#eqFillGrad)" />
+          {/* Zero line (bright) */}
+          {showZeroLine && (
+            <line x1={PAD_X} y1={zeroY} x2={W - 8} y2={zeroY}
+              stroke="var(--text-dim)" strokeWidth="0.7" strokeDasharray="4,3" opacity="0.5" />
+          )}
 
-        {/* Equity line */}
-        <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+          {/* Fill under curve */}
+          <path d={fillPath} fill={`url(#${fillId})`} />
 
-        {/* End dot */}
-        <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="2.5" fill={lineColor} />
+          {/* Main equity line */}
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
 
-        {/* Y-axis labels */}
-        <text x={PAD_X - 2} y={PAD_Y + 3} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace">
-          {maxVal >= 0 ? "+" : ""}{maxVal.toFixed(0)}
-        </text>
-        <text x={PAD_X - 2} y={H - PAD_Y + 1} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace">
-          {minVal >= 0 ? "+" : ""}{minVal.toFixed(0)}
-        </text>
-        {showZeroLine && (
-          <text x={PAD_X - 2} y={zeroY + 2} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="monospace" opacity="0.6">
-            0
-          </text>
-        )}
-      </svg>
+          {/* Glow effect on line */}
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" opacity="0.1" />
+
+          {/* Start dot */}
+          <circle cx={toX(0)} cy={toY(0)} r="2" fill="var(--text-dim)" />
+
+          {/* End dot with glow */}
+          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="5" fill={lineColor} opacity="0.15" />
+          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="3" fill={lineColor} />
+          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="1.5" fill="white" opacity="0.6" />
+        </svg>
+      </div>
     </div>
   );
 }
 
 function StatBox({ label, value, color }: { label: string; value: string; color?: "g" | "r" }) {
   return (
-    <div className="bg-[var(--surface)] rounded px-1.5 py-0.5 text-center">
-      <div className="text-[8px] text-[var(--text-dim)] uppercase">{label}</div>
-      <div className={`font-mono font-semibold text-[10px] ${
+    <div className="bg-[var(--bg-subtle,var(--bg))] rounded-lg px-1.5 py-1 text-center border border-[var(--border)]/50">
+      <div className="text-[7px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">{label}</div>
+      <div className={`font-[JetBrains_Mono,monospace] font-bold text-[10px] ${
         color === "g" ? "text-[var(--green)]" : color === "r" ? "text-[var(--red)]" : "text-[var(--text)]"
       }`}>{value}</div>
     </div>

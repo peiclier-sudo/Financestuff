@@ -227,34 +227,30 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
   const savedCount = typeof window !== "undefined" ? loadSavedContexts().length : 0;
 
   return (
-    <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+    <div className="glass-panel overflow-hidden flex flex-col h-full rounded-t-none border-t-0">
       {/* Header */}
-      <div className="px-3 py-1.5 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between flex-shrink-0">
+      <div className="px-3 py-2 border-b border-[var(--border)] bg-[var(--surface-2)]/50 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
           <span className="text-[var(--purple)] text-xs">&#9672;</span>
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-[var(--text-muted)]">
+          <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">
             AI Deep Analysis
           </h3>
-          <span className="text-[10px] text-[var(--text-dim)]">DeepSeek</span>
+          <span className="text-[9px] font-[JetBrains_Mono,monospace] text-[var(--text-dim)] bg-[var(--surface)] px-1.5 py-0.5 rounded-full border border-[var(--border)]">DeepSeek</span>
           {savedCount > 0 && (
-            <span className="text-[9px] text-[var(--purple)]/60 bg-[var(--purple)]/10 px-1.5 py-0.5 rounded-full">
-              {savedCount} prior {savedCount === 1 ? "analysis" : "analyses"} in memory
+            <span className="text-[9px] text-[var(--purple)]/60 bg-[var(--purple)]/10 px-1.5 py-0.5 rounded-full border border-[var(--purple)]/20">
+              {savedCount} prior
             </span>
           )}
         </div>
         <button
           onClick={analyze}
           disabled={loading || days.length === 0}
-          className={`px-2.5 py-0.5 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
-            loading
-              ? "bg-[var(--border)] text-[var(--text-dim)]"
-              : "bg-[var(--accent-dim)] text-white hover:bg-[var(--accent)] active:scale-95"
-          }`}
+          className={`btn-purple ${loading ? "opacity-50 pointer-events-none" : ""}`}
         >
           {loading ? (
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5">
               <span className="inline-block w-2.5 h-2.5 border border-white/30 border-t-white rounded-full animate-spin" />
-              Deep analyzing...
+              Analyzing...
             </span>
           ) : (
             `Analyze ${days.length} days`
@@ -265,37 +261,39 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
       {/* Scrollable content area */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
         {error && (
-          <div className="text-[11px] text-[var(--red)] bg-[var(--red)]/10 rounded px-2 py-1.5">
+          <div className="text-[11px] text-[var(--red)] bg-[var(--red)]/10 rounded-lg px-2.5 py-1.5 border border-[var(--red)]/20">
             {error}
           </div>
         )}
 
         {loading && !analysis && (
-          <div className="flex flex-col items-center gap-2 text-[11px] text-[var(--text-muted)] py-6">
-            <span className="pulse-glow text-[var(--purple)]">&#9672;</span>
-            <span>Running deep analysis on {days.length} trading days...</span>
-            <span className="text-[10px] text-[var(--text-dim)]">
-              Computing gap fills, correlations, sequential patterns, candle structure...
+          <div className="flex flex-col items-center gap-3 text-[11px] text-[var(--text-muted)] py-8 fade-in">
+            <div className="w-8 h-8 rounded-full border border-[var(--purple)]/30 flex items-center justify-center">
+              <span className="pulse-glow text-[var(--purple)] text-lg">&#9672;</span>
+            </div>
+            <span className="font-medium">Analyzing {days.length} trading days...</span>
+            <span className="text-[9px] text-[var(--text-dim)] uppercase tracking-wider">
+              Gap fills &middot; Correlations &middot; Patterns &middot; Candle structure
             </span>
           </div>
         )}
 
         {analysis && (
           <div
-            className="ai-content text-[11px] text-[var(--text-muted)] leading-relaxed"
+            className="ai-content text-[11px] text-[var(--text-muted)] leading-relaxed fade-in"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(analysis) }}
           />
         )}
 
         {/* Chat messages */}
         {chatMessages.map((msg, i) => (
-          <div key={i} className={`text-[11px] leading-relaxed ${
+          <div key={i} className={`text-[11px] leading-relaxed fade-in ${
             msg.role === "user"
-              ? "bg-[var(--accent-dim)]/15 rounded-lg px-2.5 py-1.5 text-[var(--text)] ml-6"
+              ? "glass-panel-sm px-2.5 py-1.5 text-[var(--text)] ml-6 border-l-2 border-l-[var(--accent)]"
               : "ai-content text-[var(--text-muted)]"
           }`}>
             {msg.role === "user" ? (
-              msg.content
+              <span className="font-medium">{msg.content}</span>
             ) : (
               <div dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }} />
             )}
@@ -303,23 +301,31 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         ))}
 
         {chatLoading && (
-          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)]">
+          <div className="flex items-center gap-1.5 text-[11px] text-[var(--text-dim)] fade-in">
             <span className="pulse-glow text-[var(--purple)]">&#9672;</span>
             Thinking...
           </div>
         )}
 
         {!analysis && !loading && !error && chatMessages.length === 0 && (
-          <p className="text-[11px] text-[var(--text-dim)] text-center py-4">
-            Click &quot;Analyze&quot; for a deep pattern report with gap fills, correlations, sequential patterns &amp; trading thesis — or type a question below.
-          </p>
+          <div className="flex flex-col items-center gap-2 py-6 fade-in">
+            <div className="w-8 h-8 rounded-full border border-[var(--border-bright)] flex items-center justify-center">
+              <span className="text-[var(--purple)] text-sm">&#9672;</span>
+            </div>
+            <p className="text-[11px] text-[var(--text-dim)] text-center">
+              Click &quot;Analyze&quot; for a deep pattern report
+            </p>
+            <p className="text-[9px] text-[var(--text-dim)] text-center">
+              or type a question below
+            </p>
+          </div>
         )}
 
         <div ref={chatEndRef} />
       </div>
 
       {/* Chat input */}
-      <div className="flex-shrink-0 border-t border-[var(--border)] p-2">
+      <div className="flex-shrink-0 border-t border-[var(--border)] bg-[var(--surface-2)]/30 p-2">
         <div className="flex gap-1.5">
           <input
             type="text"
@@ -327,16 +333,16 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
             onChange={(e) => setChatInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask DeepSeek about these patterns..."
-            className="flex-1 text-[11px]"
+            className="flex-1 text-[11px] bg-[var(--surface)] border border-[var(--border)] rounded-lg px-2.5 py-1.5 focus:border-[var(--purple)]/50 focus:outline-none focus:ring-1 focus:ring-[var(--purple)]/20 transition-all placeholder:text-[var(--text-dim)]"
             disabled={chatLoading}
           />
           <button
             onClick={sendChat}
             disabled={chatLoading || !chatInput.trim()}
-            className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all cursor-pointer uppercase tracking-wider ${
               chatLoading || !chatInput.trim()
                 ? "bg-[var(--border)] text-[var(--text-dim)]"
-                : "bg-[var(--purple)]/20 text-[var(--purple)] hover:bg-[var(--purple)]/30 active:scale-95"
+                : "bg-[var(--purple)]/20 text-[var(--purple)] hover:bg-[var(--purple)]/30 active:scale-95 border border-[var(--purple)]/30"
             }`}
           >
             Send
