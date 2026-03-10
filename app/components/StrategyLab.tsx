@@ -15,9 +15,10 @@ import {
 interface Props {
   days: TradingDay[];
   filterDescription: string;
+  onResult?: (result: StrategyResult | null) => void;
 }
 
-export default function StrategyLab({ days, filterDescription }: Props) {
+export default function StrategyLab({ days, filterDescription, onResult }: Props) {
   const [selectedStrategy, setSelectedStrategy] = useState<StrategyParams>(STRATEGIES[0]);
   const [params, setParams] = useState<Record<string, number | string>>({});
   const [result, setResult] = useState<StrategyResult | null>(null);
@@ -65,6 +66,11 @@ export default function StrategyLab({ days, filterDescription }: Props) {
   }, [viewingSaved]);
 
   const activeResult = viewingSaved || result;
+
+  // Notify parent of active result changes
+  useEffect(() => {
+    onResult?.(activeResult);
+  }, [activeResult, onResult]);
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
