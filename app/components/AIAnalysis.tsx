@@ -130,6 +130,24 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
     setChatMessages([]);
 
     try {
+      // Downsample bars to 30-min buckets to keep payload manageable
+      const downsample30min = (bars: { time: number; open: number; high: number; low: number; close: number }[]) => {
+        if (bars.length === 0) return [];
+        const buckets: { time: number; open: number; high: number; low: number; close: number }[] = [];
+        const bucketSize = 6; // 6 × 5-min = 30 min
+        for (let i = 0; i < bars.length; i += bucketSize) {
+          const chunk = bars.slice(i, i + bucketSize);
+          buckets.push({
+            time: chunk[0].time,
+            open: chunk[0].open,
+            high: Math.max(...chunk.map(b => b.high)),
+            low: Math.min(...chunk.map(b => b.low)),
+            close: chunk[chunk.length - 1].close,
+          });
+        }
+        return buckets;
+      };
+
       const daySummaries = days.map(d => ({
         date: d.date,
         dayName: d.dayName,
@@ -149,6 +167,7 @@ export default function AIAnalysis({ days, stats, criteria }: Props) {
         bodyPercent: d.bodyPercent,
         upperWickPercent: d.upperWickPercent,
         lowerWickPercent: d.lowerWickPercent,
+        bars: downsample30min(d.bars),
       }));
 
       const res = await fetch("/api/analyze", {
