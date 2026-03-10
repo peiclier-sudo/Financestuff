@@ -24,6 +24,8 @@ export interface TradingDay {
   prevDayChangePercent: number | null;
   prevDayRangePercent: number | null;
   prevDayGapPercent: number | null;
+  prevDayHigh: number | null;
+  prevDayLow: number | null;
   // Intraday stats
   bodyPercent: number; // abs(close - open) / open * 100
   upperWickPercent: number; // (high - max(open,close)) / open * 100
