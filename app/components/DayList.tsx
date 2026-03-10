@@ -5,18 +5,19 @@ import { TradingDay } from "@/lib/types";
 
 interface Props {
   days: TradingDay[];
-  selectedDate: string | null;
-  onSelect: (date: string) => void;
+  selectedDates: string[];
+  onSelect: (date: string, ctrlKey: boolean) => void;
 }
 
-export default function DayList({ days, selectedDate, onSelect }: Props) {
+export default function DayList({ days, selectedDates, onSelect }: Props) {
   const selectedRef = useRef<HTMLTableRowElement>(null);
+  const primaryDate = selectedDates.length > 0 ? selectedDates[selectedDates.length - 1] : null;
 
   useEffect(() => {
     if (selectedRef.current) {
       selectedRef.current.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  }, [selectedDate]);
+  }, [primaryDate]);
 
   if (days.length === 0) {
     return (
@@ -26,8 +27,22 @@ export default function DayList({ days, selectedDate, onSelect }: Props) {
     );
   }
 
+  const selectedSet = new Set(selectedDates);
+  const multiSelected = selectedDates.length > 1;
+
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
+      {multiSelected && (
+        <div className="px-1.5 py-0.5 bg-[var(--accent-dim)]/10 border-b border-[var(--border)] text-[9px] text-[var(--accent)] flex items-center justify-between flex-shrink-0">
+          <span>{selectedDates.length} days selected — Ctrl+click to toggle</span>
+          <button
+            onClick={() => onSelect(primaryDate!, false)}
+            className="text-[var(--text-dim)] hover:text-[var(--text)] underline"
+          >
+            Clear
+          </button>
+        </div>
+      )}
       <div className="overflow-y-auto flex-1">
         <table className="w-full text-[10px]">
           <thead className="sticky top-0 bg-[var(--surface-2)] border-b border-[var(--border)] z-10">
@@ -43,16 +58,19 @@ export default function DayList({ days, selectedDate, onSelect }: Props) {
           </thead>
           <tbody>
             {days.map((day) => {
-              const isSelected = selectedDate === day.date;
+              const isPrimary = primaryDate === day.date;
+              const isSecondary = !isPrimary && selectedSet.has(day.date);
               return (
                 <tr
                   key={day.date}
-                  ref={isSelected ? selectedRef : undefined}
-                  onClick={() => onSelect(day.date)}
+                  ref={isPrimary ? selectedRef : undefined}
+                  onClick={(e) => onSelect(day.date, e.ctrlKey || e.metaKey)}
                   className={`cursor-pointer border-b border-[var(--border)] transition-all duration-100 ${
-                    isSelected
+                    isPrimary
                       ? "bg-[var(--accent-dim)]/15 border-l-2 border-l-[var(--accent)]"
-                      : "hover:bg-[var(--surface-hover)] border-l-2 border-l-transparent"
+                      : isSecondary
+                        ? "bg-[#58a6ff10] border-l-2 border-l-[#58a6ff60]"
+                        : "hover:bg-[var(--surface-hover)] border-l-2 border-l-transparent"
                   }`}
                 >
                   <td className="px-1.5 py-0.5 font-mono text-[var(--text-muted)]">

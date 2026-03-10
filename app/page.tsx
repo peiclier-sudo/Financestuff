@@ -32,7 +32,7 @@ const DEFAULT_CRITERIA: FilterCriteria = {
 export default function Home() {
   const [allDays, setAllDays] = useState<TradingDay[]>([]);
   const [criteria, setCriteria] = useState<FilterCriteria>(DEFAULT_CRITERIA);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rightTab, setRightTab] = useState<"ai" | "strategy">("strategy");
@@ -58,41 +58,77 @@ export default function Home() {
   const filteredDays = useMemo(() => filterDays(allDays, criteria), [allDays, criteria]);
   const stats = useMemo(() => computeStats(filteredDays), [filteredDays]);
 
-  const selectedDay = useMemo(
-    () => (selectedDate ? allDays.find((d) => d.date === selectedDate) ?? null : null),
-    [allDays, selectedDate]
+  // Primary date = last in the selection
+  const primaryDate = selectedDates.length > 0 ? selectedDates[selectedDates.length - 1] : null;
+
+  // Resolve selected TradingDay objects
+  const allDaysMap = useMemo(() => {
+    const m = new Map<string, TradingDay>();
+    allDays.forEach(d => m.set(d.date, d));
+    return m;
+  }, [allDays]);
+
+  const primaryDay = primaryDate ? allDaysMap.get(primaryDate) ?? null : null;
+
+  const selectedDayObjects = useMemo(
+    () => selectedDates.map(d => allDaysMap.get(d)).filter((d): d is TradingDay => d != null),
+    [selectedDates, allDaysMap]
   );
 
-  const handleSelect = useCallback((date: string) => {
-    setSelectedDate(date);
+  // Overlay days = all selected except primary
+  const overlayDays = useMemo(() => {
+    if (selectedDates.length <= 1) return undefined;
+    return selectedDates
+      .slice(0, -1) // exclude primary (last)
+      .map(date => {
+        const day = allDaysMap.get(date);
+        return day ? { date, bars: day.bars } : null;
+      })
+      .filter((d): d is { date: string; bars: typeof allDays[0]["bars"] } => d != null);
+  }, [selectedDates, allDaysMap, allDays]);
+
+  const handleSelect = useCallback((date: string, ctrlKey: boolean) => {
+    if (ctrlKey) {
+      setSelectedDates(prev => {
+        if (prev.includes(date)) {
+          // Remove it, but keep at least 1 selected
+          const next = prev.filter(d => d !== date);
+          return next.length > 0 ? next : [date];
+        }
+        return [...prev, date];
+      });
+    } else {
+      // Normal click: replace selection
+      setSelectedDates([date]);
+    }
   }, []);
 
   const handleReset = useCallback(() => {
     setCriteria(DEFAULT_CRITERIA);
   }, []);
 
-  // Keyboard navigation
+  // Keyboard navigation (moves primary, resets to single selection)
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!filteredDays.length) return;
       const target = e.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "SELECT") return;
+      if (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA") return;
 
-      const currentIndex = filteredDays.findIndex((d) => d.date === selectedDate);
+      const currentIndex = filteredDays.findIndex((d) => d.date === primaryDate);
 
       if (e.key === "ArrowDown" || e.key === "j") {
         e.preventDefault();
         const next = Math.min(currentIndex + 1, filteredDays.length - 1);
-        setSelectedDate(filteredDays[next].date);
+        setSelectedDates([filteredDays[next].date]);
       } else if (e.key === "ArrowUp" || e.key === "k") {
         e.preventDefault();
         const prev = Math.max(currentIndex - 1, 0);
-        setSelectedDate(filteredDays[prev].date);
+        setSelectedDates([filteredDays[prev].date]);
       }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [filteredDays, selectedDate]);
+  }, [filteredDays, primaryDate]);
 
   if (loading) {
     return (
@@ -126,7 +162,7 @@ export default function Home() {
             {allDays[0]?.date} → {allDays[allDays.length - 1]?.date}
           </span>
         </div>
-        <span className="text-[10px] text-[var(--text-dim)]">↑↓ or j/k to navigate</span>
+        <span className="text-[10px] text-[var(--text-dim)]">↑↓ navigate | Ctrl+click multi-select</span>
       </header>
 
       {/* Filters */}
@@ -149,23 +185,24 @@ export default function Home() {
       <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
         {/* Left: Summary on top, day list below */}
         <div className="col-span-3 flex flex-col gap-1 min-h-0">
-          {selectedDay && (
+          {selectedDayObjects.length > 0 && (
             <div className="flex-shrink-0">
-              <DaySummary day={selectedDay} />
+              <DaySummary days={selectedDayObjects} />
             </div>
           )}
           <div className="flex-1 min-h-0">
-            <DayList days={filteredDays} selectedDate={selectedDate} onSelect={handleSelect} />
+            <DayList days={filteredDays} selectedDates={selectedDates} onSelect={handleSelect} />
           </div>
         </div>
 
         {/* Center: Chart — full height */}
         <div className="col-span-6 min-h-0">
-          {selectedDay ? (
+          {primaryDay ? (
             <CandlestickChart
-              bars={selectedDay.bars}
-              title={`${selectedDay.date} ${selectedDay.dayName} — ${selectedDay.bars.length} bars`}
-              prevClose={selectedDay.prevClose}
+              bars={primaryDay.bars}
+              title={`${primaryDay.date} ${primaryDay.dayName} — ${primaryDay.bars.length} bars${selectedDates.length > 1 ? ` (+${selectedDates.length - 1} overlay)` : ""}`}
+              prevClose={primaryDay.prevClose}
+              overlayDays={overlayDays}
             />
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full">

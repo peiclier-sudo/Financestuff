@@ -4,15 +4,31 @@ import { useEffect, useRef, useState } from "react";
 import { createChart, CandlestickSeries, LineSeries } from "lightweight-charts";
 import { Bar } from "@/lib/types";
 
+// Colors for overlay lines (up to 12 distinct)
+const OVERLAY_COLORS = [
+  "#8b5cf6", "#06b6d4", "#f59e0b", "#ec4899", "#10b981",
+  "#6366f1", "#14b8a6", "#f97316", "#a855f7", "#22d3ee",
+  "#84cc16", "#e879f9",
+];
+
+interface OverlayDay {
+  date: string;
+  bars: Bar[];
+}
+
 interface Props {
   bars: Bar[];
   title?: string;
   prevClose?: number | null;
+  overlayDays?: OverlayDay[];
 }
 
-export default function CandlestickChart({ bars, title, prevClose }: Props) {
+export default function CandlestickChart({ bars, title, prevClose, overlayDays }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showPrevClose, setShowPrevClose] = useState(true);
+  const [showOverlay, setShowOverlay] = useState(true);
+
+  const hasOverlays = overlayDays && overlayDays.length > 0;
 
   useEffect(() => {
     if (!containerRef.current || bars.length === 0) return;
@@ -69,17 +85,15 @@ export default function CandlestickChart({ bars, title, prevClose }: Props) {
       const lineSeries = chart.addSeries(LineSeries, {
         color: "#f0883e",
         lineWidth: 1,
-        lineStyle: 2, // dashed
+        lineStyle: 2,
         priceLineVisible: false,
         crosshairMarkerVisible: false,
         lastValueVisible: false,
       });
-      // Draw a flat line across the entire time range
       lineSeries.setData([
         { time: bars[0].time as import("lightweight-charts").UTCTimestamp, value: prevClose },
         { time: bars[bars.length - 1].time as import("lightweight-charts").UTCTimestamp, value: prevClose },
       ]);
-      // Add price line label on the right axis
       lineSeries.createPriceLine({
         price: prevClose,
         color: "#f0883e",
@@ -90,6 +104,46 @@ export default function CandlestickChart({ bars, title, prevClose }: Props) {
         axisLabelColor: "#f0883e",
         axisLabelTextColor: "#0d1117",
       });
+    }
+
+    // Overlay days: remap their bars onto the primary day's time axis
+    if (showOverlay && hasOverlays) {
+      const primaryStart = bars[0].time;
+
+      for (let oi = 0; oi < overlayDays!.length; oi++) {
+        const oDay = overlayDays![oi];
+        if (oDay.bars.length === 0) continue;
+        const oStart = oDay.bars[0].time;
+        const color = OVERLAY_COLORS[oi % OVERLAY_COLORS.length];
+
+        // Remap overlay bars onto the primary time axis by offset
+        const remapped = oDay.bars
+          .map((b) => ({
+            time: (primaryStart + (b.time - oStart)) as import("lightweight-charts").UTCTimestamp,
+            open: b.open,
+            high: b.high,
+            low: b.low,
+            close: b.close,
+          }))
+          // Only keep bars that fall within the primary range
+          .filter((b) => b.time >= bars[0].time && b.time <= bars[bars.length - 1].time);
+
+        if (remapped.length < 2) continue;
+
+        const overlaySeries = chart.addSeries(LineSeries, {
+          color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          crosshairMarkerVisible: false,
+          lastValueVisible: false,
+          lineStyle: 0,
+        });
+
+        overlaySeries.setData(remapped.map((b) => ({
+          time: b.time,
+          value: b.close,
+        })));
+      }
     }
 
     chart.timeScale().fitContent();
@@ -108,24 +162,37 @@ export default function CandlestickChart({ bars, title, prevClose }: Props) {
       window.removeEventListener("resize", handleResize);
       chart.remove();
     };
-  }, [bars, prevClose, showPrevClose]);
+  }, [bars, prevClose, showPrevClose, overlayDays, showOverlay, hasOverlays]);
 
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg overflow-hidden flex flex-col h-full">
       {title && (
         <div className="px-3 py-1 border-b border-[var(--border)] bg-[var(--surface-2)] flex items-center justify-between flex-shrink-0">
           <h3 className="text-[10px] font-medium text-[var(--text-muted)]">{title}</h3>
-          {prevClose != null && (
-            <label className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={showPrevClose}
-                onChange={(e) => setShowPrevClose(e.target.checked)}
-                className="w-3 h-3 accent-[#f0883e]"
-              />
-              <span style={{ color: "#f0883e" }}>Prev Close</span>
-            </label>
-          )}
+          <div className="flex items-center gap-3">
+            {hasOverlays && (
+              <label className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showOverlay}
+                  onChange={(e) => setShowOverlay(e.target.checked)}
+                  className="w-3 h-3 accent-[#8b5cf6]"
+                />
+                <span style={{ color: "#8b5cf6" }}>Overlay ({overlayDays!.length})</span>
+              </label>
+            )}
+            {prevClose != null && (
+              <label className="flex items-center gap-1 text-[10px] text-[var(--text-dim)] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showPrevClose}
+                  onChange={(e) => setShowPrevClose(e.target.checked)}
+                  className="w-3 h-3 accent-[#f0883e]"
+                />
+                <span style={{ color: "#f0883e" }}>Prev Close</span>
+              </label>
+            )}
+          </div>
         </div>
       )}
       <div ref={containerRef} className="flex-1 min-h-0" />
