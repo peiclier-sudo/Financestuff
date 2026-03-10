@@ -3,12 +3,14 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { TradingDay, FilterCriteria } from "@/lib/types";
 import { parseCSV, groupIntoDays, filterDays, computeStats } from "@/lib/dataUtils";
+import { buildFilterDescription } from "@/lib/filterDescription";
 import FilterPanel from "./components/FilterPanel";
 import DayList from "./components/DayList";
 import CandlestickChart from "./components/CandlestickChart";
 import StatsBar from "./components/StatsBar";
 import DaySummary from "./components/DaySummary";
 import AIAnalysis from "./components/AIAnalysis";
+import StrategyLab from "./components/StrategyLab";
 
 const DEFAULT_CRITERIA: FilterCriteria = {
   dayOfWeek: null,
@@ -33,6 +35,7 @@ export default function Home() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rightTab, setRightTab] = useState<"ai" | "strategy">("strategy");
 
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -174,9 +177,37 @@ export default function Home() {
           )}
         </div>
 
-        {/* Right: AI Analysis */}
-        <div className="col-span-3 min-h-0">
-          <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
+        {/* Right: Tabbed panel — Strategy Lab / AI Analysis */}
+        <div className="col-span-3 min-h-0 flex flex-col">
+          <div className="flex bg-[var(--surface)] border border-b-0 border-[var(--border)] rounded-t-lg overflow-hidden flex-shrink-0">
+            <button
+              onClick={() => setRightTab("strategy")}
+              className={`flex-1 text-[10px] py-1 font-semibold tracking-wide transition-colors ${
+                rightTab === "strategy"
+                  ? "bg-[var(--surface-2)] text-[var(--accent)] border-b-2 border-[var(--accent)]"
+                  : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+              }`}
+            >
+              Strategy Lab
+            </button>
+            <button
+              onClick={() => setRightTab("ai")}
+              className={`flex-1 text-[10px] py-1 font-semibold tracking-wide transition-colors ${
+                rightTab === "ai"
+                  ? "bg-[var(--surface-2)] text-[var(--accent)] border-b-2 border-[var(--accent)]"
+                  : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+              }`}
+            >
+              AI Analysis
+            </button>
+          </div>
+          <div className="flex-1 min-h-0">
+            {rightTab === "strategy" ? (
+              <StrategyLab days={filteredDays} filterDescription={buildFilterDescription(criteria)} />
+            ) : (
+              <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
+            )}
+          </div>
         </div>
       </div>
     </div>
