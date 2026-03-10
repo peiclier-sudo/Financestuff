@@ -1,5 +1,62 @@
 @import "tailwindcss";
 
+/* ── react-grid-layout ── */
+.react-grid-layout {
+  position: relative;
+  transition: height 200ms ease;
+}
+.react-grid-item {
+  transition: all 200ms ease;
+  transition-property: left, top, width, height;
+}
+.react-grid-item.cssTransforms {
+  transition-property: transform, width, height;
+}
+.react-grid-item.resizing {
+  transition: none;
+  z-index: 1;
+  will-change: width, height;
+}
+.react-grid-item.react-draggable-dragging {
+  transition: none;
+  z-index: 3;
+  will-change: transform;
+}
+.react-grid-placeholder {
+  background: var(--accent);
+  opacity: 0.08;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--accent);
+  transition-duration: 100ms;
+  z-index: 2;
+  user-select: none;
+}
+.react-grid-item > .react-resizable-handle {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+  z-index: 10;
+}
+.react-grid-item > .react-resizable-handle::after {
+  content: "";
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--border-bright);
+  border-bottom: 2px solid var(--border-bright);
+  opacity: 0.4;
+  transition: opacity 0.2s;
+}
+.react-grid-item:hover > .react-resizable-handle::after {
+  opacity: 0.8;
+  border-color: var(--accent);
+}
+
 :root {
   --bg: #050608;
   --bg-subtle: #0a0c10;
