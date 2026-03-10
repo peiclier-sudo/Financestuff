@@ -142,32 +142,32 @@ export default function Home() {
         <StatsBar stats={stats} />
       </div>
 
-      {/* Main content: 3 columns */}
+      {/* Main content: 3 columns — left narrow (summary + list), center wide (chart), right narrow (AI) */}
       <div className="flex-1 grid grid-cols-12 gap-2 min-h-0">
-        {/* Left: Day list */}
-        <div className="col-span-4 min-h-0">
-          <DayList days={filteredDays} selectedDate={selectedDate} onSelect={handleSelect} />
+        {/* Left: Summary on top, day list below */}
+        <div className="col-span-3 flex flex-col gap-1 min-h-0">
+          {selectedDay && (
+            <div className="flex-shrink-0">
+              <DaySummary day={selectedDay} />
+            </div>
+          )}
+          <div className="flex-1 min-h-0">
+            <DayList days={filteredDays} selectedDate={selectedDate} onSelect={handleSelect} />
+          </div>
         </div>
 
-        {/* Center: Chart + Summary */}
-        <div className="col-span-4 flex flex-col gap-2 min-h-0">
+        {/* Center: Chart — full height */}
+        <div className="col-span-6 min-h-0">
           {selectedDay ? (
-            <>
-              <div className="flex-1 min-h-0">
-                <CandlestickChart
-                  bars={selectedDay.bars}
-                  title={`${selectedDay.date} ${selectedDay.dayName} — ${selectedDay.bars.length} bars`}
-                  height={280}
-                />
-              </div>
-              <div className="flex-shrink-0">
-                <DaySummary day={selectedDay} />
-              </div>
-            </>
+            <CandlestickChart
+              bars={selectedDay.bars}
+              title={`${selectedDay.date} ${selectedDay.dayName} — ${selectedDay.bars.length} bars`}
+              prevClose={selectedDay.prevClose}
+            />
           ) : (
             <div className="bg-[var(--surface)] border border-[var(--border)] rounded-lg flex items-center justify-center h-full">
               <div className="text-center">
-                <p className="text-[var(--text-dim)] text-sm mb-1">Select a day</p>
+                <p className="text-[var(--text-dim)] text-xs mb-1">Select a day</p>
                 <p className="text-[var(--text-dim)] text-[10px]">Click a row or use arrow keys</p>
               </div>
             </div>
@@ -175,7 +175,7 @@ export default function Home() {
         </div>
 
         {/* Right: AI Analysis */}
-        <div className="col-span-4 min-h-0">
+        <div className="col-span-3 min-h-0">
           <AIAnalysis days={filteredDays} stats={stats} criteria={criteria} />
         </div>
       </div>
