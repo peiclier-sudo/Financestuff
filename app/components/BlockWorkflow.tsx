@@ -255,15 +255,22 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
             >
               {/* Block header — drag handle + title + controls */}
               <div
-                className="flex items-center gap-1 px-1.5 py-1 cursor-grab active:cursor-grabbing select-none"
+                className="flex items-center gap-1.5 px-1.5 py-1 cursor-grab active:cursor-grabbing select-none"
                 onClick={() => toggleExpanded(blockId)}
               >
-                {/* Drag grip */}
-                <span className="text-[var(--text-dim)] opacity-40 hover:opacity-80 flex-shrink-0 text-[9px] leading-none" style={{ letterSpacing: "1px" }}>⠿</span>
+                {/* Drag grip — 3 horizontal lines */}
+                <span className="flex-shrink-0 flex flex-col gap-[2px] opacity-30 hover:opacity-70 transition-opacity" style={{ width: 10 }}>
+                  <span className="block h-[1px] rounded-full bg-[var(--text-muted)]" />
+                  <span className="block h-[1px] rounded-full bg-[var(--text-muted)]" />
+                  <span className="block h-[1px] rounded-full bg-[var(--text-muted)]" />
+                </span>
                 {/* Step badge */}
                 <span
-                  className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 text-white"
-                  style={{ backgroundColor: isConfirmed ? "var(--green)" : color }}
+                  className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold flex-shrink-0 text-white"
+                  style={{
+                    backgroundColor: isConfirmed ? "var(--green)" : color,
+                    boxShadow: `0 0 8px ${isConfirmed ? "rgba(0,230,118,0.25)" : "transparent"}`,
+                  }}
                 >
                   {isConfirmed ? "\u2713" : blockId + 1}
                 </span>
@@ -810,8 +817,11 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
 
   return (
     <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
-      <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
-        <span className="font-semibold text-[var(--text-secondary)] text-[10px]">Results</span>
+      <div className="px-2.5 py-1.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0" style={{ background: "linear-gradient(180deg, rgba(96, 165, 250, 0.06) 0%, transparent 100%)" }}>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_var(--accent)]" />
+          <span className="font-semibold text-[var(--accent)] text-[10px] tracking-wide">Results</span>
+        </div>
         <div className="flex gap-1 items-center">
           {canShowRR && (
             <button
@@ -985,15 +995,27 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
   const toX = (i: number) => PAD_X + (i / (cumulative.length - 1)) * plotW;
   const toY = (v: number) => PAD_Y + plotH - ((v - minVal) / range) * plotH;
   const linePath = cumulative.map((v, i) => `${i === 0 ? "M" : "L"}${toX(i).toFixed(1)},${toY(v).toFixed(1)}`).join(" ");
+  const zeroClampY = Math.min(toY(0), PAD_Y + plotH);
+  const fillPath = linePath + ` L${toX(cumulative.length - 1).toFixed(1)},${zeroClampY.toFixed(1)} L${toX(0).toFixed(1)},${zeroClampY.toFixed(1)} Z`;
   const finalVal = cumulative[cumulative.length - 1];
   const isPositive = finalVal >= 0;
   const lineColor = isPositive ? "var(--green)" : "var(--red)";
+  const showZeroLine = minVal < 0 && maxVal > 0;
+  const gradId = `eqFill_${isPositive ? "g" : "r"}`;
 
   let peak = 0, maxDd = 0;
   for (const v of cumulative) { if (v > peak) peak = v; const dd = peak - v; if (dd > maxDd) maxDd = dd; }
 
+  // Grid lines
+  const midVal = (maxVal + minVal) / 2;
+  const gridLines = [
+    { y: toY(maxVal), label: `${maxVal >= 0 ? "+" : ""}${maxVal.toFixed(decimals)}` },
+    { y: toY(midVal), label: `${midVal >= 0 ? "+" : ""}${midVal.toFixed(decimals)}` },
+    { y: toY(minVal), label: `${minVal >= 0 ? "+" : ""}${minVal.toFixed(decimals)}` },
+  ];
+
   return (
-    <div className="border-t border-[var(--border)] pt-1 mt-1 flex flex-col" style={{ minHeight: 140 }}>
+    <div className="border-t border-[var(--border)] pt-1 mt-1 flex flex-col slide-in" style={{ minHeight: 150 }}>
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center gap-2">
           <span className="text-[8px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">Equity</span>
@@ -1012,10 +1034,32 @@ function EquityCurve({ trades, displayMode = "pts" }: { trades: TradeResult[]; d
           </span>
         </div>
       </div>
-      <div style={{ height: 110 }}>
+      <div style={{ height: 120 }}>
         <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinejoin="round" />
-          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="3" fill={lineColor} />
+          <defs>
+            <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={lineColor} stopOpacity="0.15" />
+              <stop offset="100%" stopColor={lineColor} stopOpacity="0" />
+            </linearGradient>
+          </defs>
+          {/* Grid lines */}
+          {gridLines.map((gl, i) => (
+            <g key={i}>
+              <line x1={PAD_X} y1={gl.y} x2={W - 8} y2={gl.y} stroke="var(--border)" strokeWidth="0.5" opacity="0.4" />
+              <text x={PAD_X - 3} y={gl.y + 3} textAnchor="end" fontSize="7" fill="var(--text-dim)" fontFamily="JetBrains Mono, monospace" opacity="0.6">{gl.label}</text>
+            </g>
+          ))}
+          {/* Zero line */}
+          {showZeroLine && <line x1={PAD_X} y1={toY(0)} x2={W - 8} y2={toY(0)} stroke="var(--text-dim)" strokeWidth="0.5" strokeDasharray="3,2" opacity="0.4" />}
+          {/* Fill */}
+          <path d={fillPath} fill={`url(#${gradId})`} />
+          {/* Line */}
+          <path d={linePath} fill="none" stroke={lineColor} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+          {/* Start dot */}
+          <circle cx={toX(0)} cy={toY(0)} r="2" fill="var(--text-dim)" opacity="0.5" />
+          {/* End dot */}
+          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="3.5" fill={lineColor} />
+          <circle cx={toX(cumulative.length - 1)} cy={toY(finalVal)} r="1.5" fill="white" opacity="0.5" />
         </svg>
       </div>
     </div>
@@ -1152,8 +1196,10 @@ function TradesTable({ trades, displayMode }: { trades: TradeResult[]; displayMo
 // ══════════════════════════════════════════════════════════
 
 function StatBox({ label, value, color }: { label: string; value: string; color?: "g" | "r" }) {
+  const bg = color === "g" ? "rgba(0, 230, 118, 0.04)" : color === "r" ? "rgba(255, 82, 82, 0.04)" : "var(--bg-subtle,var(--bg))";
+  const borderC = color === "g" ? "rgba(0, 230, 118, 0.12)" : color === "r" ? "rgba(255, 82, 82, 0.12)" : "var(--border)";
   return (
-    <div className="bg-[var(--bg-subtle,var(--bg))] rounded px-1 py-0.5 text-center border border-[var(--border)]/50">
+    <div className="rounded px-1 py-0.5 text-center" style={{ background: bg, border: `1px solid ${borderC}` }}>
       <div className="text-[7px] text-[var(--text-dim)] uppercase tracking-widest font-semibold">{label}</div>
       <div className={`font-mono font-bold text-[9px] ${color === "g" ? "text-[var(--green)]" : color === "r" ? "text-[var(--red)]" : "text-[var(--text)]"}`}>{value}</div>
     </div>
@@ -1161,8 +1207,10 @@ function StatBox({ label, value, color }: { label: string; value: string; color?
 }
 
 function StatBoxLg({ label, value, color }: { label: string; value: string; color?: "g" | "r" }) {
+  const bg = color === "g" ? "rgba(0, 230, 118, 0.04)" : color === "r" ? "rgba(255, 82, 82, 0.04)" : "var(--bg-subtle,var(--bg))";
+  const borderC = color === "g" ? "rgba(0, 230, 118, 0.12)" : color === "r" ? "rgba(255, 82, 82, 0.12)" : "var(--border)";
   return (
-    <div className="bg-[var(--bg-subtle,var(--bg))] rounded-lg px-2 py-1.5 text-center border border-[var(--border)]/50">
+    <div className="rounded-lg px-2 py-1.5 text-center" style={{ background: bg, border: `1px solid ${borderC}` }}>
       <div className="text-[8px] text-[var(--text-dim)] uppercase tracking-widest font-semibold mb-0.5">{label}</div>
       <div className={`font-mono font-bold text-sm ${color === "g" ? "text-[var(--green)]" : color === "r" ? "text-[var(--red)]" : "text-[var(--text)]"}`}>{value}</div>
     </div>
