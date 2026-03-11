@@ -234,22 +234,29 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
+    <div className="h-screen flex flex-col overflow-hidden noise-overlay">
       {/* ── Top bar ── */}
       <div ref={topBarRef} className="flex-shrink-0 px-3 pt-2 pb-1 space-y-1.5">
         <header className="flex items-center justify-between px-1">
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]" />
-              <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-[var(--text)] to-[var(--text-secondary)] bg-clip-text text-transparent">NDX Day Filter</h1>
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
+                <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--accent)] animate-ping opacity-30" />
+              </div>
+              <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-white via-[var(--text)] to-[var(--text-secondary)] bg-clip-text text-transparent">NDX Day Filter</h1>
             </div>
-            <span className="text-[10px] text-[var(--text-dim)] font-[JetBrains_Mono,monospace] bg-[var(--surface)] px-2 py-0.5 rounded-full border border-[var(--border)]">
-              {allDays[0]?.date} — {allDays[allDays.length - 1]?.date}
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="w-px h-3 bg-[var(--border-bright)]" />
+              <span className="text-[10px] text-[var(--text-dim)] font-[JetBrains_Mono,monospace] bg-[var(--surface)] px-2.5 py-0.5 rounded-full border border-[var(--border)]" style={{ letterSpacing: "0.02em" }}>
+                {allDays[0]?.date} — {allDays[allDays.length - 1]?.date}
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleResetLayout} className="text-[8px] text-[var(--text-dim)] hover:text-[var(--accent)] uppercase tracking-wide transition-colors">Reset Layout</button>
-            <span className="text-[9px] text-[var(--text-dim)] tracking-wide uppercase">drag panels to move</span>
+            <button onClick={handleResetLayout} className="text-[8px] text-[var(--text-dim)] hover:text-[var(--accent)] uppercase tracking-widest transition-colors px-2 py-0.5 rounded hover:bg-[var(--accent)]/5">Reset Layout</button>
+            <div className="w-px h-3 bg-[var(--border)]" />
+            <span className="text-[8px] text-[var(--text-dim)] tracking-widest uppercase opacity-50">drag to move</span>
           </div>
         </header>
 
@@ -345,28 +352,38 @@ export default function Home() {
 // Panel wrapper — glassmorphism container with drag handle
 // ══════════════════════════════════════════════════════════
 
+const PANEL_ACCENT: Record<string, string> = {
+  daylist: "96, 165, 250",
+  chart: "0, 230, 118",
+  strategy: "192, 132, 252",
+};
+
 function Panel({ id, children, tabs }: { id: string; children: React.ReactNode; tabs?: React.ReactNode }) {
+  const rgb = PANEL_ACCENT[id] || "96, 165, 250";
   return (
     <div className="h-full flex flex-col rounded-xl overflow-hidden" style={{
-      background: "linear-gradient(145deg, rgba(12, 15, 21, 0.95), rgba(18, 22, 30, 0.88))",
+      background: `linear-gradient(160deg, rgba(12, 15, 21, 0.96), rgba(18, 22, 30, 0.90))`,
       border: "1px solid var(--border)",
-      backdropFilter: "blur(16px)",
-      boxShadow: "0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.02) inset, 0 0 0 1px rgba(255,255,255,0.02) inset",
+      borderTopColor: `rgba(${rgb}, 0.2)`,
+      backdropFilter: "blur(20px)",
+      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 0 40px rgba(${rgb}, 0.02)`,
     }}>
       {/* Title bar — drag handle */}
       <div className="panel-drag-handle flex items-center gap-2 px-3 py-1.5 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{
-        background: "linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%)",
+        background: `linear-gradient(180deg, rgba(${rgb}, 0.04) 0%, transparent 100%)`,
         borderBottom: "1px solid var(--border)",
       }}>
         {/* Window dots */}
-        <div className="flex gap-1">
-          <div className="w-[7px] h-[7px] rounded-full bg-[var(--red)]/40 hover:bg-[var(--red)]/80 transition-colors" />
-          <div className="w-[7px] h-[7px] rounded-full bg-[var(--orange)]/40 hover:bg-[var(--orange)]/80 transition-colors" />
-          <div className="w-[7px] h-[7px] rounded-full bg-[var(--green)]/40 hover:bg-[var(--green)]/80 transition-colors" />
+        <div className="flex gap-1.5">
+          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(255, 82, 82, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
+          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(255, 171, 64, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
+          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(0, 230, 118, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
         </div>
+        {/* Separator */}
+        <div className="w-px h-3 bg-[var(--border)]" />
         {/* Icon + Title */}
-        <span className="text-[var(--text-dim)] text-[9px]">{PANEL_ICONS[id]}</span>
-        <span className="text-[9px] font-semibold text-[var(--text-muted)] uppercase tracking-widest">{PANEL_TITLES[id]}</span>
+        <span className="text-[9px] opacity-40">{PANEL_ICONS[id]}</span>
+        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{PANEL_TITLES[id]}</span>
         {/* Optional tabs */}
         {tabs}
       </div>
