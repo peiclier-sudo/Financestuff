@@ -81,7 +81,8 @@ export default function Home() {
   const { width: containerWidth, mounted, containerRef: gridContainerRef } = useContainerWidth({ initialWidth: 1400 });
   const topBarRef = useRef<HTMLDivElement>(null);
   const [gridHeight, setGridHeight] = useState(600);
-  const dynamicRowH = (gridHeight - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
+  // containerPadding vertical = 6+6=12, margins between rows = (GRID_ROWS-1)*MARGIN
+  const dynamicRowH = (gridHeight - 12 - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
 
   useEffect(() => {
     setLayout(loadLayout());
@@ -91,8 +92,8 @@ export default function Home() {
   useEffect(() => {
     const compute = () => {
       const topH = topBarRef.current?.offsetHeight ?? 0;
-      // 8px padding (px-2 top + pb-2 bottom of grid container)
-      const available = window.innerHeight - topH - 16;
+      // containerPadding [8,6] adds 12px vertical
+      const available = window.innerHeight - topH;
       setGridHeight(Math.max(available, 200));
     };
     compute();
@@ -234,7 +235,7 @@ export default function Home() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden noise-overlay">
+    <div className="h-screen flex flex-col overflow-hidden">
       {/* ── Top bar ── */}
       <div ref={topBarRef} className="flex-shrink-0 px-3 pt-2 pb-1 space-y-1.5">
         <header className="flex items-center justify-between px-1">
@@ -265,12 +266,12 @@ export default function Home() {
       </div>
 
       {/* ── Grid panels ── */}
-      <div className="px-2 pb-2" ref={gridContainerRef} style={{ height: gridHeight }}>
+      <div ref={gridContainerRef} style={{ height: gridHeight }}>
         {mounted && (
           <GridLayout
             layout={layout}
             width={containerWidth}
-            gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [0, 0] }}
+            gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [8, 6] }}
             dragConfig={{ handle: ".panel-drag-handle" }}
             onLayoutChange={handleLayoutChange}
             compactor={noCompactor}
@@ -362,11 +363,10 @@ function Panel({ id, children, tabs }: { id: string; children: React.ReactNode; 
   const rgb = PANEL_ACCENT[id] || "96, 165, 250";
   return (
     <div className="h-full flex flex-col rounded-xl overflow-hidden" style={{
-      background: `linear-gradient(160deg, rgba(12, 15, 21, 0.96), rgba(18, 22, 30, 0.90))`,
+      background: `linear-gradient(160deg, #0c0f15, #12161e)`,
       border: "1px solid var(--border)",
       borderTopColor: `rgba(${rgb}, 0.2)`,
-      backdropFilter: "blur(20px)",
-      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 -1px 0 rgba(0,0,0,0.2) inset, 0 0 40px rgba(${rgb}, 0.02)`,
+      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
     }}>
       {/* Title bar — drag handle */}
       <div className="panel-drag-handle flex items-center gap-2 px-3 py-1.5 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{

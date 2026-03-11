@@ -888,7 +888,7 @@ function ResultsModal({ result, onClose }: { result: StrategyResult; onClose: ()
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-6" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="absolute inset-0 bg-black/70" />
       <div
         className="relative bg-[var(--bg)] border border-[var(--border-bright)] rounded-lg shadow-2xl w-full max-w-3xl max-h-[85vh] flex flex-col overflow-hidden"
         onClick={e => e.stopPropagation()}
