@@ -81,8 +81,7 @@ export default function Home() {
   const { width: containerWidth, mounted, containerRef: gridContainerRef } = useContainerWidth({ initialWidth: 1400 });
   const topBarRef = useRef<HTMLDivElement>(null);
   const [gridHeight, setGridHeight] = useState(600);
-  // containerPadding vertical = 6+6=12, margins between rows = (GRID_ROWS-1)*MARGIN
-  const dynamicRowH = (gridHeight - 12 - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
+  const dynamicRowH = (gridHeight - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
 
   useEffect(() => {
     setLayout(loadLayout());
@@ -92,7 +91,6 @@ export default function Home() {
   useEffect(() => {
     const compute = () => {
       const topH = topBarRef.current?.offsetHeight ?? 0;
-      // containerPadding [8,6] adds 12px vertical
       const available = window.innerHeight - topH;
       setGridHeight(Math.max(available, 200));
     };
@@ -266,12 +264,12 @@ export default function Home() {
       </div>
 
       {/* ── Grid panels ── */}
-      <div ref={gridContainerRef} style={{ height: gridHeight }}>
+      <div ref={gridContainerRef} style={{ height: gridHeight, width: "100%" }}>
         {mounted && (
           <GridLayout
             layout={layout}
             width={containerWidth}
-            gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [8, 6] }}
+            gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [0, 0] }}
             dragConfig={{ handle: ".panel-drag-handle" }}
             onLayoutChange={handleLayoutChange}
             compactor={noCompactor}
