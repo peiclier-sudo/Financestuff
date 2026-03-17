@@ -29,7 +29,16 @@ const DEFAULT_LAYOUT: LayoutItem[] = [
 function loadLayout(): LayoutItem[] {
   try {
     const raw = localStorage.getItem(LAYOUT_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const items: LayoutItem[] = JSON.parse(raw);
+      // Ensure panels fill all columns — stretch last panel if needed
+      const totalW = items.reduce((s, it) => s + it.w, 0);
+      if (totalW < COLS && items.length > 0) {
+        const last = items.reduce((a, b) => a.x > b.x ? a : b);
+        last.w += COLS - totalW;
+      }
+      return items;
+    }
   } catch {}
   return DEFAULT_LAYOUT.map(l => ({ ...l }));
 }
@@ -181,8 +190,15 @@ export default function Home() {
   const handleStrategyResult = useCallback((result: StrategyResult | null) => setStrategyResult(result), []);
 
   const handleLayoutChange = useCallback((newLayout: readonly LayoutItem[]) => {
-    setLayout([...newLayout]);
-    saveLayout([...newLayout]);
+    const items = [...newLayout];
+    // Ensure panels fill all columns
+    const totalW = items.reduce((s, it) => s + it.w, 0);
+    if (totalW < COLS && items.length > 0) {
+      const last = items.reduce((a, b) => a.x > b.x ? a : b);
+      last.w += COLS - totalW;
+    }
+    setLayout(items);
+    saveLayout(items);
   }, []);
 
   const handleResetLayout = useCallback(() => {
