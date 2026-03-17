@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { GridLayout, useContainerWidth, noCompactor } from "react-grid-layout";
+import { GridLayout, noCompactor } from "react-grid-layout";
 import type { LayoutItem } from "react-grid-layout";
 import { TradingDay, FilterCriteria } from "@/lib/types";
 import { parseCSV, groupIntoDays, filterDays, computeStats } from "@/lib/dataUtils";
@@ -87,25 +87,26 @@ export default function Home() {
   const [rightTab, setRightTab] = useState<"designer" | "ai_analysis">("designer");
   const [strategyResult, setStrategyResult] = useState<StrategyResult | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>(() => DEFAULT_LAYOUT.map(l => ({ ...l })));
-  const { width: containerWidth, mounted, containerRef: gridContainerRef } = useContainerWidth({ initialWidth: 1400 });
   const topBarRef = useRef<HTMLDivElement>(null);
   const [gridHeight, setGridHeight] = useState(600);
+  const [containerWidth, setContainerWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1400);
+  const [mounted, setMounted] = useState(false);
   const dynamicRowH = (gridHeight - (GRID_ROWS - 1) * MARGIN) / GRID_ROWS;
 
   useEffect(() => {
     setLayout(loadLayout());
   }, []);
 
-  // Compute available grid height from viewport minus top bar
+  // Compute available grid height + width from viewport
   useEffect(() => {
+    setMounted(true);
     const compute = () => {
       const topH = topBarRef.current?.offsetHeight ?? 0;
-      const available = window.innerHeight - topH;
-      setGridHeight(Math.max(available, 200));
+      setGridHeight(Math.max(window.innerHeight - topH, 200));
+      setContainerWidth(window.innerWidth);
     };
     compute();
     window.addEventListener("resize", compute);
-    // Also observe top bar in case it changes height
     const ro = new ResizeObserver(compute);
     if (topBarRef.current) ro.observe(topBarRef.current);
     return () => { window.removeEventListener("resize", compute); ro.disconnect(); };
@@ -280,7 +281,7 @@ export default function Home() {
       </div>
 
       {/* ── Grid panels ── */}
-      <div ref={gridContainerRef} style={{ height: gridHeight, width: "100%" }}>
+      <div style={{ height: gridHeight, width: "100vw" }}>
         {mounted && (
           <GridLayout
             layout={layout}
