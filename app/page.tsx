@@ -21,24 +21,42 @@ const GRID_ROWS = 16;
 const MARGIN = 6;
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: "daylist", x: 0, y: 0, w: 5, h: GRID_ROWS, minW: 3, minH: 4 },
-  { i: "chart", x: 5, y: 0, w: 13, h: GRID_ROWS, minW: 6, minH: 4 },
-  { i: "strategy", x: 18, y: 0, w: 6, h: GRID_ROWS, minW: 4, minH: 4 },
+  { i: "daylist", x: 0, y: 0, w: 5, h: GRID_ROWS, minW: 3, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
+  { i: "chart", x: 5, y: 0, w: 12, h: GRID_ROWS, minW: 5, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
+  { i: "strategy", x: 17, y: 0, w: 7, h: GRID_ROWS, minW: 4, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: [] as ("e")[] },
 ];
+
+function normalizeLayout(items: LayoutItem[]): LayoutItem[] {
+  // Apply per-item constraints from defaults
+  const defaults = new Map(DEFAULT_LAYOUT.map(d => [d.i, d]));
+  for (const it of items) {
+    const def = defaults.get(it.i);
+    if (def) {
+      it.minW = def.minW;
+      it.minH = def.minH;
+      it.maxH = def.maxH;
+      it.resizeHandles = def.resizeHandles;
+    }
+    it.h = GRID_ROWS;
+    it.y = 0;
+  }
+  // Sort by x and repack to fill COLS
+  items.sort((a, b) => a.x - b.x);
+  let x = 0;
+  for (let idx = 0; idx < items.length; idx++) {
+    items[idx].x = x;
+    if (idx === items.length - 1) {
+      items[idx].w = Math.max(COLS - x, items[idx].minW ?? 3);
+    }
+    x += items[idx].w;
+  }
+  return items;
+}
 
 function loadLayout(): LayoutItem[] {
   try {
     const raw = localStorage.getItem(LAYOUT_KEY);
-    if (raw) {
-      const items: LayoutItem[] = JSON.parse(raw);
-      // Ensure panels fill all columns — stretch last panel if needed
-      const totalW = items.reduce((s, it) => s + it.w, 0);
-      if (totalW < COLS && items.length > 0) {
-        const last = items.reduce((a, b) => a.x > b.x ? a : b);
-        last.w += COLS - totalW;
-      }
-      return items;
-    }
+    if (raw) return normalizeLayout(JSON.parse(raw));
   } catch {}
   return DEFAULT_LAYOUT.map(l => ({ ...l }));
 }
@@ -191,15 +209,58 @@ export default function Home() {
   const handleStrategyResult = useCallback((result: StrategyResult | null) => setStrategyResult(result), []);
 
   const handleLayoutChange = useCallback((newLayout: readonly LayoutItem[]) => {
-    const items = [...newLayout];
-    // Ensure panels fill all columns
-    const totalW = items.reduce((s, it) => s + it.w, 0);
-    if (totalW < COLS && items.length > 0) {
-      const last = items.reduce((a, b) => a.x > b.x ? a : b);
-      last.w += COLS - totalW;
+    const items = [...newLayout].map(it => ({ ...it, h: GRID_ROWS, y: 0 }));
+    // Sort by x position
+    items.sort((a, b) => a.x - b.x);
+    // Repack: ensure panels are contiguous and fill all COLS
+    let x = 0;
+    for (let idx = 0; idx < items.length; idx++) {
+      items[idx].x = x;
+      if (idx === items.length - 1) {
+        // Last panel fills remaining space
+        items[idx].w = Math.max(COLS - x, items[idx].minW ?? 3);
+      }
+      x += items[idx].w;
     }
     setLayout(items);
     saveLayout(items);
+  }, []);
+
+  // When a panel is resized, shrink/grow the panel to its right
+  const handleResizeStop: (layout: readonly LayoutItem[], oldItem: LayoutItem | null, newItem: LayoutItem | null) => void = useCallback((_layout, oldItem, newItem) => {
+    if (!oldItem || !newItem) return;
+    const delta = newItem.w - oldItem.w;
+    if (delta === 0) return;
+    setLayout(prev => {
+      const items = prev.map(it => ({ ...it }));
+      items.sort((a, b) => a.x - b.x);
+      const idx = items.findIndex(it => it.i === newItem.i);
+      if (idx < 0 || idx >= items.length - 1) return prev;
+      // Apply resize to the dragged panel
+      items[idx].w = newItem.w;
+      // Shrink/grow the next panel by the delta
+      const next = items[idx + 1];
+      const nextMinW = next.minW ?? 3;
+      next.w = Math.max(next.w - delta, nextMinW);
+      // Repack x positions
+      let x = 0;
+      for (const it of items) {
+        it.x = x;
+        it.y = 0;
+        it.h = GRID_ROWS;
+        x += it.w;
+      }
+      // If total exceeds COLS, clamp the resized panel
+      const total = items.reduce((s, it) => s + it.w, 0);
+      if (total > COLS) {
+        items[idx].w -= total - COLS;
+        // Repack again
+        x = 0;
+        for (const it of items) { it.x = x; x += it.w; }
+      }
+      saveLayout(items);
+      return items;
+    });
   }, []);
 
   const handleResetLayout = useCallback(() => {
@@ -288,7 +349,9 @@ export default function Home() {
             width={containerWidth}
             gridConfig={{ cols: COLS, rowHeight: dynamicRowH, margin: [MARGIN, MARGIN], containerPadding: [0, 0] }}
             dragConfig={{ handle: ".panel-drag-handle" }}
+            resizeConfig={{ enabled: true, handles: ["e"] }}
             onLayoutChange={handleLayoutChange}
+            onResizeStop={handleResizeStop}
             compactor={noCompactor}
           >
             {/* ── Day List Panel ── */}
