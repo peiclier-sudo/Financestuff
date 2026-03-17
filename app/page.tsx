@@ -15,15 +15,15 @@ import DaySummary from "./components/DaySummary";
 import AIAnalysis from "./components/AIAnalysis";
 import BlockWorkflow from "./components/BlockWorkflow";
 
-const LAYOUT_KEY = "ndx_panel_layout";
-const COLS = 24;
+const LAYOUT_KEY = "ndx_panel_layout_v2";
+const COLS = 96;
 const GRID_ROWS = 16;
 const MARGIN = 6;
 
 const DEFAULT_LAYOUT: LayoutItem[] = [
-  { i: "daylist", x: 0, y: 0, w: 5, h: GRID_ROWS, minW: 3, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
-  { i: "chart", x: 5, y: 0, w: 12, h: GRID_ROWS, minW: 5, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
-  { i: "strategy", x: 17, y: 0, w: 7, h: GRID_ROWS, minW: 4, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: [] as ("e")[] },
+  { i: "daylist", x: 0, y: 0, w: 20, h: GRID_ROWS, minW: 10, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
+  { i: "chart", x: 20, y: 0, w: 48, h: GRID_ROWS, minW: 20, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: ["e"] },
+  { i: "strategy", x: 68, y: 0, w: 28, h: GRID_ROWS, minW: 16, minH: GRID_ROWS, maxH: GRID_ROWS, resizeHandles: [] as ("e")[] },
 ];
 
 function normalizeLayout(items: LayoutItem[]): LayoutItem[] {
@@ -372,7 +372,7 @@ export default function Home() {
           >
             {/* ── Day List Panel ── */}
             <div key="daylist">
-              <Panel id="daylist" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "daylist")?.w}>
+              <Panel id="daylist" isResizing={resizingId != null} widthPercent={Math.round(((layout.find(l => l.i === "daylist")?.w ?? 0) / COLS) * 100)}>
                 <div className="flex flex-col h-full gap-1">
                   {selectedDayObjects.length > 0 && (
                     <div className="flex-shrink-0">
@@ -388,7 +388,7 @@ export default function Home() {
 
             {/* ── Chart Panel ── */}
             <div key="chart">
-              <Panel id="chart" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "chart")?.w}>
+              <Panel id="chart" isResizing={resizingId != null} widthPercent={Math.round(((layout.find(l => l.i === "chart")?.w ?? 0) / COLS) * 100)}>
                 {primaryDay ? (
                   <CandlestickChart
                     bars={primaryDay.bars}
@@ -413,7 +413,7 @@ export default function Home() {
 
             {/* ── Strategy Panel ── */}
             <div key="strategy">
-              <Panel id="strategy" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "strategy")?.w} tabs={
+              <Panel id="strategy" isResizing={resizingId != null} widthPercent={Math.round(((layout.find(l => l.i === "strategy")?.w ?? 0) / COLS) * 100)} tabs={
                 <div className="flex ml-auto gap-0.5">
                   <button
                     onClick={() => setRightTab("designer")}
@@ -453,29 +453,15 @@ const PANEL_ACCENT: Record<string, string> = {
   strategy: "192, 132, 252",
 };
 
-function Panel({ id, children, tabs, isResizing, widthCols }: { id: string; children: React.ReactNode; tabs?: React.ReactNode; isResizing?: boolean; widthCols?: number }) {
+function Panel({ id, children, tabs, isResizing, widthPercent }: { id: string; children: React.ReactNode; tabs?: React.ReactNode; isResizing?: boolean; widthPercent?: number }) {
   const rgb = PANEL_ACCENT[id] || "96, 165, 250";
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pxWidth, setPxWidth] = useState(0);
-
-  useEffect(() => {
-    if (!isResizing || !panelRef.current) return;
-    const el = panelRef.current;
-    const update = () => setPxWidth(el.offsetWidth);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [isResizing]);
-
   return (
-    <div ref={panelRef} className={`h-full flex flex-col rounded-xl overflow-hidden ${isResizing ? "ring-1 ring-[var(--accent)]/30" : ""}`} style={{
+    <div className="h-full flex flex-col rounded-xl overflow-hidden" style={{
       background: `linear-gradient(160deg, #0c0f15, #12161e)`,
-      border: "1px solid var(--border)",
+      border: isResizing ? `1px solid rgba(${rgb}, 0.3)` : "1px solid var(--border)",
       borderTopColor: `rgba(${rgb}, 0.2)`,
-      boxShadow: isResizing
-        ? `0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(${rgb}, 0.15), 0 0 30px rgba(${rgb}, 0.06)`
-        : `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
+      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
+      contain: "layout style",
     }}>
       {/* Title bar — drag handle */}
       <div className="panel-drag-handle flex items-center gap-2 px-3 py-1.5 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{
@@ -484,23 +470,20 @@ function Panel({ id, children, tabs, isResizing, widthCols }: { id: string; chil
       }}>
         {/* Window dots */}
         <div className="flex gap-1.5">
-          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(255, 82, 82, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
-          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(255, 171, 64, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
-          <div className="w-[8px] h-[8px] rounded-full transition-all" style={{ background: `rgba(0, 230, 118, 0.35)`, boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 82, 82, 0.35)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 171, 64, 0.35)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(0, 230, 118, 0.35)` }} />
         </div>
-        {/* Separator */}
         <div className="w-px h-3 bg-[var(--border)]" />
-        {/* Icon + Title */}
         <span className="text-[9px] opacity-40">{PANEL_ICONS[id]}</span>
         <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{PANEL_TITLES[id]}</span>
         {/* Width badge during resize */}
-        {isResizing && widthCols != null && (
-          <span className="ml-auto text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full fade-in" style={{
+        {isResizing && widthPercent != null && (
+          <span className="ml-auto text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full" style={{
             background: `rgba(${rgb}, 0.15)`,
             color: `rgba(${rgb}, 0.9)`,
-            border: `1px solid rgba(${rgb}, 0.25)`,
           }}>
-            {pxWidth}px · {widthCols}/{COLS}
+            {widthPercent}%
           </span>
         )}
         {/* Optional tabs */}
