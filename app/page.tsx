@@ -209,15 +209,14 @@ export default function Home() {
   const handleStrategyResult = useCallback((result: StrategyResult | null) => setStrategyResult(result), []);
 
   const handleLayoutChange = useCallback((newLayout: readonly LayoutItem[]) => {
+    // Only persist if not mid-resize (onResizeStop handles that)
+    if (resizingRef.current) return;
     const items = [...newLayout].map(it => ({ ...it, h: GRID_ROWS, y: 0 }));
-    // Sort by x position
     items.sort((a, b) => a.x - b.x);
-    // Repack: ensure panels are contiguous and fill all COLS
     let x = 0;
     for (let idx = 0; idx < items.length; idx++) {
       items[idx].x = x;
       if (idx === items.length - 1) {
-        // Last panel fills remaining space
         items[idx].w = Math.max(COLS - x, items[idx].minW ?? 3);
       }
       x += items[idx].w;
@@ -226,42 +225,57 @@ export default function Home() {
     saveLayout(items);
   }, []);
 
-  // When a panel is resized, shrink/grow the panel to its right
-  const handleResizeStop: (layout: readonly LayoutItem[], oldItem: LayoutItem | null, newItem: LayoutItem | null) => void = useCallback((_layout, oldItem, newItem) => {
-    if (!oldItem || !newItem) return;
-    const delta = newItem.w - oldItem.w;
-    if (delta === 0) return;
-    setLayout(prev => {
-      const items = prev.map(it => ({ ...it }));
-      items.sort((a, b) => a.x - b.x);
-      const idx = items.findIndex(it => it.i === newItem.i);
-      if (idx < 0 || idx >= items.length - 1) return prev;
-      // Apply resize to the dragged panel
-      items[idx].w = newItem.w;
-      // Shrink/grow the next panel by the delta
-      const next = items[idx + 1];
-      const nextMinW = next.minW ?? 3;
-      next.w = Math.max(next.w - delta, nextMinW);
-      // Repack x positions
-      let x = 0;
-      for (const it of items) {
-        it.x = x;
-        it.y = 0;
-        it.h = GRID_ROWS;
-        x += it.w;
-      }
-      // If total exceeds COLS, clamp the resized panel
-      const total = items.reduce((s, it) => s + it.w, 0);
-      if (total > COLS) {
-        items[idx].w -= total - COLS;
-        // Repack again
-        x = 0;
-        for (const it of items) { it.x = x; x += it.w; }
-      }
-      saveLayout(items);
-      return items;
-    });
+  const resizingRef = useRef(false);
+  const [resizingId, setResizingId] = useState<string | null>(null);
+  const preResizeLayoutRef = useRef<LayoutItem[]>([]);
+
+  // Compute linked layout from a resize delta
+  const computeLinkedLayout = useCallback((base: LayoutItem[], resizedId: string, newW: number): LayoutItem[] => {
+    const items = base.map(it => ({ ...it }));
+    items.sort((a, b) => a.x - b.x);
+    const idx = items.findIndex(it => it.i === resizedId);
+    if (idx < 0 || idx >= items.length - 1) return items;
+    const oldW = items[idx].w;
+    const delta = newW - oldW;
+    if (delta === 0) return items;
+    items[idx].w = newW;
+    const next = items[idx + 1];
+    const nextMinW = next.minW ?? 3;
+    next.w = Math.max(next.w - delta, nextMinW);
+    // Repack
+    let x = 0;
+    for (const it of items) { it.x = x; it.y = 0; it.h = GRID_ROWS; x += it.w; }
+    const total = items.reduce((s, it) => s + it.w, 0);
+    if (total > COLS) {
+      items[idx].w -= total - COLS;
+      x = 0;
+      for (const it of items) { it.x = x; x += it.w; }
+    }
+    return items;
   }, []);
+
+  const handleResizeStart: (layout: readonly LayoutItem[], oldItem: LayoutItem | null, newItem: LayoutItem | null) => void = useCallback((_layout, _oldItem, newItem) => {
+    resizingRef.current = true;
+    setResizingId(newItem?.i ?? null);
+    preResizeLayoutRef.current = layout.map(it => ({ ...it }));
+  }, [layout]);
+
+  // Live preview during resize — update layout in real time
+  const handleResize: (layout: readonly LayoutItem[], oldItem: LayoutItem | null, newItem: LayoutItem | null) => void = useCallback((_layout, _oldItem, newItem) => {
+    if (!newItem) return;
+    const linked = computeLinkedLayout(preResizeLayoutRef.current, newItem.i, newItem.w);
+    setLayout(linked);
+  }, [computeLinkedLayout]);
+
+  // Finalize on stop
+  const handleResizeStop: (layout: readonly LayoutItem[], oldItem: LayoutItem | null, newItem: LayoutItem | null) => void = useCallback((_layout, _oldItem, newItem) => {
+    resizingRef.current = false;
+    setResizingId(null);
+    if (!newItem) return;
+    const linked = computeLinkedLayout(preResizeLayoutRef.current, newItem.i, newItem.w);
+    setLayout(linked);
+    saveLayout(linked);
+  }, [computeLinkedLayout]);
 
   const handleResetLayout = useCallback(() => {
     const fresh = DEFAULT_LAYOUT.map(l => ({ ...l }));
@@ -351,12 +365,14 @@ export default function Home() {
             dragConfig={{ handle: ".panel-drag-handle" }}
             resizeConfig={{ enabled: true, handles: ["e"] }}
             onLayoutChange={handleLayoutChange}
+            onResizeStart={handleResizeStart}
+            onResize={handleResize}
             onResizeStop={handleResizeStop}
             compactor={noCompactor}
           >
             {/* ── Day List Panel ── */}
             <div key="daylist">
-              <Panel id="daylist">
+              <Panel id="daylist" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "daylist")?.w}>
                 <div className="flex flex-col h-full gap-1">
                   {selectedDayObjects.length > 0 && (
                     <div className="flex-shrink-0">
@@ -372,7 +388,7 @@ export default function Home() {
 
             {/* ── Chart Panel ── */}
             <div key="chart">
-              <Panel id="chart">
+              <Panel id="chart" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "chart")?.w}>
                 {primaryDay ? (
                   <CandlestickChart
                     bars={primaryDay.bars}
@@ -397,7 +413,7 @@ export default function Home() {
 
             {/* ── Strategy Panel ── */}
             <div key="strategy">
-              <Panel id="strategy" tabs={
+              <Panel id="strategy" isResizing={resizingId != null} widthCols={layout.find(l => l.i === "strategy")?.w} tabs={
                 <div className="flex ml-auto gap-0.5">
                   <button
                     onClick={() => setRightTab("designer")}
@@ -437,14 +453,29 @@ const PANEL_ACCENT: Record<string, string> = {
   strategy: "192, 132, 252",
 };
 
-function Panel({ id, children, tabs }: { id: string; children: React.ReactNode; tabs?: React.ReactNode }) {
+function Panel({ id, children, tabs, isResizing, widthCols }: { id: string; children: React.ReactNode; tabs?: React.ReactNode; isResizing?: boolean; widthCols?: number }) {
   const rgb = PANEL_ACCENT[id] || "96, 165, 250";
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [pxWidth, setPxWidth] = useState(0);
+
+  useEffect(() => {
+    if (!isResizing || !panelRef.current) return;
+    const el = panelRef.current;
+    const update = () => setPxWidth(el.offsetWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isResizing]);
+
   return (
-    <div className="h-full flex flex-col rounded-xl overflow-hidden" style={{
+    <div ref={panelRef} className={`h-full flex flex-col rounded-xl overflow-hidden ${isResizing ? "ring-1 ring-[var(--accent)]/30" : ""}`} style={{
       background: `linear-gradient(160deg, #0c0f15, #12161e)`,
       border: "1px solid var(--border)",
       borderTopColor: `rgba(${rgb}, 0.2)`,
-      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
+      boxShadow: isResizing
+        ? `0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(${rgb}, 0.15), 0 0 30px rgba(${rgb}, 0.06)`
+        : `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
     }}>
       {/* Title bar — drag handle */}
       <div className="panel-drag-handle flex items-center gap-2 px-3 py-1.5 cursor-grab active:cursor-grabbing select-none flex-shrink-0" style={{
@@ -462,8 +493,18 @@ function Panel({ id, children, tabs }: { id: string; children: React.ReactNode; 
         {/* Icon + Title */}
         <span className="text-[9px] opacity-40">{PANEL_ICONS[id]}</span>
         <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{PANEL_TITLES[id]}</span>
+        {/* Width badge during resize */}
+        {isResizing && widthCols != null && (
+          <span className="ml-auto text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full fade-in" style={{
+            background: `rgba(${rgb}, 0.15)`,
+            color: `rgba(${rgb}, 0.9)`,
+            border: `1px solid rgba(${rgb}, 0.25)`,
+          }}>
+            {pxWidth}px · {widthCols}/{COLS}
+          </span>
+        )}
         {/* Optional tabs */}
-        {tabs}
+        {!isResizing && tabs}
       </div>
       {/* Content */}
       <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
