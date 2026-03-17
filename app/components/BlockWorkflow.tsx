@@ -816,7 +816,7 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
   const fmt = (v: number, prefix = true) => `${prefix && v >= 0 ? "+" : ""}${v.toFixed(displayMode === "rr" ? 2 : 1)}${displayMode === "rr" ? "R" : ""}`;
 
   return (
-    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in">
+    <div className="glass-panel-sm flex flex-col fade-in">
       <div className="px-2.5 py-1.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0" style={{ background: "linear-gradient(180deg, rgba(96, 165, 250, 0.06) 0%, transparent 100%)" }}>
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_var(--accent)]" />
