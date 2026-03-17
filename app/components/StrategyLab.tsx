@@ -691,7 +691,7 @@ function ResultsPanel({
   const fmt = (v: number, prefix = true) => `${prefix && v >= 0 ? "+" : ""}${v.toFixed(displayMode === "rr" ? 2 : 1)}${displayMode === "rr" ? "R" : ""}`;
 
   return (
-    <div className="glass-panel-sm overflow-hidden flex flex-col fade-in h-full">
+    <div className="glass-panel-sm flex flex-col fade-in h-full">
       <div className="px-2.5 py-1.5 bg-[var(--surface-2)]/50 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0">
         <span className="font-semibold text-[var(--text-secondary)] text-[10px] truncate">
           {isViewingSaved ? "Saved" : "Results"}: {result.strategyLabel}
