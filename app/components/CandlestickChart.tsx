@@ -311,9 +311,13 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       }
     };
     window.addEventListener("resize", handleResize);
+    // Also observe container itself for panel resize
+    const ro = new ResizeObserver(handleResize);
+    if (containerRef.current) ro.observe(containerRef.current);
 
     return () => {
       window.removeEventListener("resize", handleResize);
+      ro.disconnect();
       chart.remove();
     };
   }, [bars, prevClose, showPrevClose, range, showRange, trade, showTrade]);

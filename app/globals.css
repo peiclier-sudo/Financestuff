@@ -3,71 +3,63 @@
 /* ── react-grid-layout ── */
 .react-grid-layout {
   position: relative;
-  transition: height 200ms ease;
 }
 .react-grid-item {
-  transition: all 150ms ease;
+  transition: none;
+  contain: layout style;
 }
 .react-grid-item.cssTransforms {
-  transition: all 150ms ease;
+  transition: none;
+  will-change: transform, width;
 }
 .react-grid-item.resizing {
-  transition: none;
   z-index: 1;
   will-change: width;
-}
-/* Adjacent panels animate smoothly during resize */
-.react-grid-layout.resizing-active .react-grid-item:not(.resizing) {
-  transition: all 80ms ease-out;
+  user-select: none;
 }
 .react-grid-item.react-draggable-dragging {
-  transition: none;
   z-index: 3;
   will-change: transform;
 }
 .react-grid-placeholder {
-  background: linear-gradient(135deg, rgba(96, 165, 250, 0.06), rgba(96, 165, 250, 0.12));
-  opacity: 1;
+  background: rgba(96, 165, 250, 0.08);
   border-radius: var(--radius-md);
   border: 1px dashed rgba(96, 165, 250, 0.3);
-  transition-duration: 100ms;
   z-index: 2;
   user-select: none;
-  box-shadow: inset 0 0 20px rgba(96, 165, 250, 0.04);
 }
-/* East (right edge) resize handle */
+/* East (right edge) resize handle — generous hit area */
 .react-grid-item > .react-resizable-handle-e {
   position: absolute;
-  width: 8px;
+  width: 14px;
   height: 100%;
   top: 0;
-  right: -4px;
+  right: -7px;
   cursor: col-resize;
   z-index: 10;
 }
 .react-grid-item > .react-resizable-handle-e::after {
   content: "";
   position: absolute;
-  right: 3px;
+  left: 50%;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translate(-50%, -50%);
   width: 3px;
-  height: 32px;
+  height: 36px;
   border-radius: 2px;
   background: var(--border-bright);
   opacity: 0;
-  transition: opacity 0.2s, background 0.2s;
+  transition: opacity 150ms;
 }
 .react-grid-item:hover > .react-resizable-handle-e::after {
-  opacity: 0.6;
+  opacity: 0.5;
 }
 .react-grid-item > .react-resizable-handle-e:hover::after,
 .react-grid-item.resizing > .react-resizable-handle-e::after {
   opacity: 1;
   background: var(--accent);
-  box-shadow: 0 0 6px var(--accent);
+  box-shadow: 0 0 8px var(--accent);
 }
-/* Hide default SE handle if present */
 .react-grid-item > .react-resizable-handle-se {
   display: none;
 }
@@ -108,6 +100,8 @@
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border-bright) transparent;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -119,6 +113,7 @@ body {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   overflow: hidden;
   height: 100vh;
+  text-rendering: optimizeLegibility;
 }
 
 /* Scrollbar */
