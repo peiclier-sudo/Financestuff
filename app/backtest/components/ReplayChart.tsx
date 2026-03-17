@@ -60,6 +60,8 @@ export default function ReplayChart({
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; price: number } | null>(null);
   const [dragging, setDragging] = useState<DragLine | null>(null);
   const lastCrosshairPrice = useRef<number>(0);
+  const timeRangeSetRef = useRef(false);
+  const prevBarsRef = useRef<Bar[]>([]);
 
   const revealedBars = bars.slice(0, revealedCount);
   const currentPrice = revealedBars.length > 0 ? revealedBars[revealedBars.length - 1].close : 0;
@@ -136,6 +138,7 @@ export default function ReplayChart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      timeRangeSetRef.current = false;
     };
   }, []);
 
@@ -306,7 +309,20 @@ export default function ReplayChart({
       createSeriesMarkers(series, markers);
     }
 
-    chart.timeScale().fitContent();
+    // Set fixed time range for the entire day — only on new day load
+    // This prevents the chart from re-zooming on every bar advance
+    const isDayChange = bars !== prevBarsRef.current;
+    if (isDayChange || !timeRangeSetRef.current) {
+      if (bars.length >= 2) {
+        const firstTime = bars[0].time as UTCTimestamp;
+        const lastTime = bars[bars.length - 1].time as UTCTimestamp;
+        chart.timeScale().setVisibleRange({ from: firstTime, to: lastTime });
+        timeRangeSetRef.current = true;
+        prevBarsRef.current = bars;
+      } else {
+        chart.timeScale().fitContent();
+      }
+    }
   }, [revealedBars, prevClose, orders, positions, closedTrades, bars]);
 
   // Handle right-click for context menu
