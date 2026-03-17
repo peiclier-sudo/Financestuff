@@ -6,15 +6,19 @@
   transition: height 200ms ease;
 }
 .react-grid-item {
-  transition: none;
+  transition: all 150ms ease;
 }
 .react-grid-item.cssTransforms {
-  transition: none;
+  transition: all 150ms ease;
 }
 .react-grid-item.resizing {
   transition: none;
   z-index: 1;
-  will-change: width, height;
+  will-change: width;
+}
+/* Adjacent panels animate smoothly during resize */
+.react-grid-layout.resizing-active .react-grid-item:not(.resizing) {
+  transition: all 80ms ease-out;
 }
 .react-grid-item.react-draggable-dragging {
   transition: none;
