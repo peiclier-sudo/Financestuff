@@ -43,17 +43,17 @@ export default function DayList({ days, selectedDates, onSelect }: Props) {
           </button>
         </div>
       )}
-      <div className="overflow-y-auto flex-1">
-        <table className="w-full text-[10px]">
+      <div className="overflow-y-auto flex-1 min-w-0">
+        <table className="w-full text-[10px] table-fixed">
           <thead className="sticky top-0 bg-[var(--surface-2)]/90 backdrop-blur-sm border-b border-[var(--border)] z-10">
             <tr>
               <th className="text-left px-1.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Date</th>
-              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-5">D</th>
-              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-5">P</th>
+              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold" style={{ width: 20 }}>D</th>
+              <th className="text-center px-0.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold" style={{ width: 20 }}>P</th>
               <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Gap</th>
               <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Chg</th>
               <th className="text-right px-1 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Rng</th>
-              <th className="text-right px-1.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold w-12 uppercase tracking-wider">Cl</th>
+              <th className="text-right px-1.5 py-1.5 text-[9px] text-[var(--text-dim)] font-semibold uppercase tracking-wider">Cl</th>
             </tr>
           </thead>
           <tbody>

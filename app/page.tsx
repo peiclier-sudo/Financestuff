@@ -466,7 +466,7 @@ function Panel({ id, children, tabs }: { id: string; children: React.ReactNode; 
         {tabs}
       </div>
       {/* Content */}
-      <div className="flex-1 min-h-0 overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
         {children}
       </div>
     </div>

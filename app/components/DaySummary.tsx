@@ -21,7 +21,7 @@ export default function DaySummary({ days }: Props) {
             {isBull ? "BULL" : "BEAR"} {day.changePercent > 0 ? "+" : ""}{day.changePercent.toFixed(2)}%
           </span>
         </div>
-        <div className="px-2 py-1.5 grid grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
+        <div className="px-2 py-1.5 grid gap-x-3 gap-y-0.5 text-[10px]" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))" }}>
           <M l="O" v={day.open.toFixed(2)} />
           <M l="H" v={day.high.toFixed(2)} />
           <M l="L" v={day.low.toFixed(2)} />
@@ -67,7 +67,7 @@ export default function DaySummary({ days }: Props) {
           Avg {avgChange >= 0 ? "+" : ""}{avgChange.toFixed(2)}%
         </span>
       </div>
-      <div className="px-2 py-1.5 grid grid-cols-4 gap-x-3 gap-y-0.5 text-[10px]">
+      <div className="px-2 py-1.5 grid gap-x-3 gap-y-0.5 text-[10px]" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(70px, 1fr))" }}>
         <M l="Bull" v={`${bullish}/${n}`} c={bullish > n / 2 ? "g" : "r"} />
         <M l="Win%" v={`${((bullish / n) * 100).toFixed(0)}%`} c={bullish > n / 2 ? "g" : "r"} />
         <M l="AvgRng" v={`${avgRange.toFixed(2)}%`} />
