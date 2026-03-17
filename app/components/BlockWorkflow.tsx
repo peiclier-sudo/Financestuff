@@ -230,8 +230,8 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
   };
 
   return (
-    <div className="glass-panel overflow-hidden flex flex-col h-full rounded-t-none border-t-0">
-      <div className="flex-1 flex flex-col min-h-0 p-1.5 text-[10px] overflow-y-auto gap-1">
+    <div className="glass-panel overflow-hidden flex flex-col h-full min-w-0 rounded-t-none border-t-0">
+      <div className="flex-1 flex flex-col min-h-0 min-w-0 p-1.5 text-[10px] overflow-y-auto gap-1">
         {/* Blocks */}
         {blockOrder.map((blockId, orderPos) => {
           const isExpanded = expanded[blockId];
@@ -280,7 +280,7 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
                 </span>
                 {/* Collapsed summary */}
                 {!isExpanded && (
-                  <span className="text-[8px] text-[var(--text-dim)] truncate max-w-[45%]">{blockSummary(blockId)}</span>
+                  <span className="text-[8px] text-[var(--text-dim)] truncate min-w-0 flex-shrink">{blockSummary(blockId)}</span>
                 )}
                 {/* Confirm button (inline) */}
                 {isExpanded && !isConfirmed && (
@@ -415,7 +415,7 @@ export default function BlockWorkflow({ days, filterDescription, onResult }: Pro
 function EntryForm({ entry, setEntry }: { entry: EntryBlock; setEntry: (e: EntryBlock) => void }) {
   return (
     <div className="space-y-1.5">
-      <div className="grid grid-cols-2 gap-1.5">
+      <div className="grid gap-1.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
         <div>
           <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Entry Type</label>
           <select
@@ -455,7 +455,7 @@ function EntryForm({ entry, setEntry }: { entry: EntryBlock; setEntry: (e: Entry
       )}
 
       {entry.type === "level_breakout" && (
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
           <div>
             <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Level</label>
             <select value={entry.level ?? "day_open"} onChange={e => setEntry({ ...entry, level: e.target.value as EntryBlock["level"] })} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]">
@@ -474,7 +474,7 @@ function EntryForm({ entry, setEntry }: { entry: EntryBlock; setEntry: (e: Entry
       )}
 
       {entry.type === "candle_close" && (
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
           <NumField label="Close bar #" value={entry.closeBar ?? 0} onChange={v => setEntry({ ...entry, closeBar: v })} min={0} max={77} />
           <div>
             <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Close dir</label>
@@ -562,7 +562,7 @@ function ExitForm({ exit, setExit }: { exit: ExitBlock; setExit: (e: ExitBlock) 
             </select>
           </div>
           {exit.candleRef === "group" && (
-            <div className="grid grid-cols-2 gap-1">
+            <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
               <NumField label="Group start" value={exit.groupStart ?? 0} onChange={v => setExit({ ...exit, groupStart: v })} min={0} max={77} />
               <NumField label="Group end" value={exit.groupEnd ?? 4} onChange={v => setExit({ ...exit, groupEnd: v })} min={0} max={77} />
             </div>
@@ -572,7 +572,7 @@ function ExitForm({ exit, setExit }: { exit: ExitBlock; setExit: (e: ExitBlock) 
       )}
 
       {exit.type === "atr" && (
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
           <NumField label="ATR ×" value={exit.atrMultiplier ?? 1.5} onChange={v => setExit({ ...exit, atrMultiplier: v })} min={0.1} max={10} step={0.1} />
           <NumField label="ATR length" value={exit.atrLength ?? 14} onChange={v => setExit({ ...exit, atrLength: v })} min={1} max={50} />
         </div>
@@ -633,7 +633,7 @@ function TakeProfitForm({ tp, setTp, hasStop }: { tp: TakeProfitBlock; setTp: (t
       )}
 
       {tp.type === "atr" && (
-        <div className="grid grid-cols-2 gap-1">
+        <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
           <NumField label="ATR ×" value={tp.atrMultiplier ?? 2} onChange={v => setTp({ ...tp, atrMultiplier: v })} min={0.1} max={10} step={0.1} />
           <NumField label="ATR length" value={tp.atrLength ?? 14} onChange={v => setTp({ ...tp, atrLength: v })} min={1} max={50} />
         </div>
@@ -663,7 +663,7 @@ function ManagementForm({ mgmt, setMgmt }: { mgmt: ManagementBlock; setMgmt: (m:
       {(mgmt.type === "be" || mgmt.type === "be_and_trail") && (
         <div className="border border-[var(--border)] rounded bg-[var(--bg)] p-1.5 space-y-1">
           <span className="text-[8px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Break-Even</span>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
             <div>
               <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Trigger</label>
               <select value={mgmt.beTrigger ?? "points"} onChange={e => setMgmt({ ...mgmt, beTrigger: e.target.value as BETriggerType })} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]">
@@ -700,7 +700,7 @@ function ManagementForm({ mgmt, setMgmt }: { mgmt: ManagementBlock; setMgmt: (m:
       {(mgmt.type === "trail" || mgmt.type === "be_and_trail") && (
         <div className="border border-[var(--border)] rounded bg-[var(--bg)] p-1.5 space-y-1">
           <span className="text-[8px] font-semibold text-[var(--text-muted)] uppercase tracking-wide">Trail Stop</span>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
             <div>
               <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Trigger</label>
               <select value={mgmt.trailTrigger ?? "points"} onChange={e => setMgmt({ ...mgmt, trailTrigger: e.target.value as TrailTriggerType })} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]">
@@ -730,7 +730,7 @@ function ManagementForm({ mgmt, setMgmt }: { mgmt: ManagementBlock; setMgmt: (m:
               </div>
             )}
           </div>
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(80px, 1fr))" }}>
             <div>
               <label className="text-[var(--text-dim)] block text-[9px] mb-0.5">Method</label>
               <select value={mgmt.trailMethod ?? "candle_hl"} onChange={e => setMgmt({ ...mgmt, trailMethod: e.target.value as TrailMethodType })} className="w-full bg-[var(--bg)] border border-[var(--border)] rounded px-1 py-0.5 text-[10px] text-[var(--text)]">
@@ -846,14 +846,12 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
 
       <div className="p-2 space-y-1 flex flex-col">
         <div className="space-y-1">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(60px, 1fr))" }}>
             <StatBox label="Trades" value={String(result.totalTrades)} />
             <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
             <StatBox label={displayMode === "rr" ? "Avg R:R" : "Avg P&L"}
               value={displayMode === "rr" && rrStats ? fmt(rrStats.avg) : fmt(result.avgPnlPoints) + (displayMode === "pts" ? " pts" : "")}
               color={(displayMode === "rr" && rrStats ? rrStats.avg : result.avgPnlPoints) >= 0 ? "g" : "r"} />
-          </div>
-          <div className="grid grid-cols-3 gap-1">
             <StatBox label={displayMode === "rr" ? "Total R" : "Total P&L"}
               value={displayMode === "rr" && rrStats ? fmt(rrStats.total) : fmt(result.totalPnlPoints)}
               color={(displayMode === "rr" && rrStats ? rrStats.total : result.totalPnlPoints) >= 0 ? "g" : "r"} />
@@ -920,7 +918,7 @@ function ResultsModal({ result, onClose }: { result: StrategyResult; onClose: ()
 
         {/* Stats grid */}
         <div className="p-4 space-y-3 flex-1 overflow-y-auto">
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
             <StatBoxLg label="Trades" value={String(result.totalTrades)} />
             <StatBoxLg label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
             <StatBoxLg label={displayMode === "rr" ? "Avg R:R" : "Avg P&L"}
@@ -930,14 +928,14 @@ function ResultsModal({ result, onClose }: { result: StrategyResult; onClose: ()
               value={displayMode === "rr" && rrStats ? fmt(rrStats.total) : fmt(result.totalPnlPoints)}
               color={(displayMode === "rr" && rrStats ? rrStats.total : result.totalPnlPoints) >= 0 ? "g" : "r"} />
           </div>
-          <div className="grid grid-cols-5 gap-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(90px, 1fr))" }}>
             <StatBoxLg label="Profit Factor" value={result.profitFactor === Infinity ? "\u221e" : result.profitFactor.toFixed(2)} color={result.profitFactor >= 1 ? "g" : "r"} />
             <StatBoxLg label="Median" value={displayMode === "rr" && rrStats ? fmt(rrStats.median) : fmt(result.medianPnlPoints)} color={(displayMode === "rr" && rrStats ? rrStats.median : result.medianPnlPoints) >= 0 ? "g" : "r"} />
             <StatBoxLg label="Avg Win" value={displayMode === "rr" && rrStats ? `+${rrStats.avgWin.toFixed(2)}R` : `+${result.avgWin.toFixed(1)}`} color="g" />
             <StatBoxLg label="Avg Loss" value={displayMode === "rr" && rrStats ? `-${rrStats.avgLoss.toFixed(2)}R` : `-${result.avgLoss.toFixed(1)}`} color="r" />
             <StatBoxLg label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
           </div>
-          <div className="grid grid-cols-4 gap-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
             <StatBoxLg label="Winners" value={String(result.winners)} color="g" />
             <StatBoxLg label="Losers" value={String(result.losers)} color="r" />
             <StatBoxLg label="Max Win" value={displayMode === "rr" && rrStats ? `+${rrStats.maxWin.toFixed(2)}R` : `+${result.maxWin.toFixed(1)}`} color="g" />

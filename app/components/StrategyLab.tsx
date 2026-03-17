@@ -271,7 +271,7 @@ export default function StrategyLab({ days, filterDescription, onResult, mode }:
                 <p className="text-[var(--text-dim)] mt-0.5 text-[9px]">{selectedStrategy.description}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-x-2 gap-y-1">
+              <div className="grid gap-x-2 gap-y-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
                 {selectedStrategy.fields.map(field => (
                   <div key={field.key}>
                     <label className="text-[var(--text-dim)] block mb-0.5">{field.label}</label>
@@ -575,7 +575,7 @@ function ManagementPanel({
           )}
         </div>
         {/* Trail Stop */}
-        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+        <div className="grid gap-x-2 gap-y-0.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
           <div>
             <label className="text-[var(--text-dim)] block text-[9px]">Trail Stop</label>
             <select
@@ -606,7 +606,7 @@ function ManagementPanel({
           )}
         </div>
         {/* Break-Even */}
-        <div className="grid grid-cols-2 gap-x-2 gap-y-0.5">
+        <div className="grid gap-x-2 gap-y-0.5" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(100px, 1fr))" }}>
           <div>
             <label className="text-[var(--text-dim)] block text-[9px]">Break-Even</label>
             <select
@@ -718,16 +718,14 @@ function ResultsPanel({
         </div>
       </div>
 
-      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0 overflow-hidden">
+      <div className="p-2 space-y-1.5 flex-1 flex flex-col min-h-0 min-w-0 overflow-hidden">
         <div className="flex-shrink-0 space-y-1">
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(60px, 1fr))" }}>
             <StatBox label="Trades" value={String(result.totalTrades)} />
             <StatBox label="Win Rate" value={`${result.winRate.toFixed(1)}%`} color={result.winRate >= 50 ? "g" : "r"} />
             <StatBox label={displayMode === "rr" ? "Avg R:R" : "Avg P&L"}
               value={displayMode === "rr" && rrStats ? fmt(rrStats.avg) : fmt(result.avgPnlPoints) + (displayMode === "pts" ? " pts" : "")}
               color={(displayMode === "rr" && rrStats ? rrStats.avg : result.avgPnlPoints) >= 0 ? "g" : "r"} />
-          </div>
-          <div className="grid grid-cols-3 gap-1">
             <StatBox label={displayMode === "rr" ? "Total R" : "Total P&L"}
               value={displayMode === "rr" && rrStats ? fmt(rrStats.total) : fmt(result.totalPnlPoints)}
               color={(displayMode === "rr" && rrStats ? rrStats.total : result.totalPnlPoints) >= 0 ? "g" : "r"} />
@@ -736,7 +734,7 @@ function ResultsPanel({
               value={displayMode === "rr" && rrStats ? fmt(rrStats.median) : fmt(result.medianPnlPoints)}
               color={(displayMode === "rr" && rrStats ? rrStats.median : result.medianPnlPoints) >= 0 ? "g" : "r"} />
           </div>
-          <div className="grid grid-cols-4 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(60px, 1fr))" }}>
             <StatBox label="Avg Win"
               value={displayMode === "rr" && rrStats ? `+${rrStats.avgWin.toFixed(2)}R` : `+${result.avgWin.toFixed(1)}`} color="g" />
             <StatBox label="Avg Loss"
@@ -746,7 +744,7 @@ function ResultsPanel({
             <StatBox label="Max Loss"
               value={displayMode === "rr" && rrStats ? `${rrStats.maxLoss.toFixed(2)}R` : result.maxLoss.toFixed(1)} color="r" />
           </div>
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid gap-1" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(60px, 1fr))" }}>
             <StatBox label="Winners" value={String(result.winners)} color="g" />
             <StatBox label="Losers" value={String(result.losers)} color="r" />
             <StatBox label="Avg Hold" value={`${result.avgHoldBars.toFixed(0)} bars`} />
