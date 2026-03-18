@@ -568,35 +568,35 @@ export default function BacktestPage() {
 
         {/* Right Panel (~30%) */}
         <div className="w-80 flex-shrink-0 border-l border-[var(--border)] overflow-y-auto" style={{ background: "var(--surface)" }}>
-          <div className="p-3 space-y-4">
+          <div className="p-2 space-y-2">
             {/* Pool Filter (collapsible) */}
             {showFilter && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9881;" title="Pool Filter" rgb="96, 165, 250">
                 <DayPoolFilter
                   filter={poolFilter}
                   onChange={setPoolFilter}
                   poolSize={dayPool.length}
                   totalSize={allDays.length}
                 />
-              </div>
+              </SidePanel>
             )}
 
             {/* Day Characteristics & Stats */}
             {currentDay && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9733;" title="Day Analysis" rgb="255, 171, 64">
                 <DayCharacteristics day={currentDay} stats={signatureStats} />
-              </div>
+              </SidePanel>
             )}
 
             {/* Hourly Stats */}
             {currentDay && signatureStats.sampleSize > 0 && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9201;" title="Hourly Stats" rgb="0, 230, 118">
                 <HourlyStats buckets={signatureStats.hourlyBuckets} />
-              </div>
+              </SidePanel>
             )}
 
             {/* Orders & Trades */}
-            <div className="glass-panel-sm p-3">
+            <SidePanel icon="&#9670;" title="Trading" rgb="192, 132, 252">
               <OrderPanel
                 orders={orders}
                 positions={positions}
@@ -610,9 +610,43 @@ export default function BacktestPage() {
                 onUpdateAllSL={handleUpdateAllSL}
                 onUpdateAllTP={handleUpdateAllTP}
               />
-            </div>
+            </SidePanel>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SidePanel — glassmorphism container matching dashboard panels
+// ══════════════════════════════════════════════════════════
+
+function SidePanel({ icon, title, rgb, children }: { icon: string; title: string; rgb: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col rounded-lg overflow-hidden" style={{
+      background: `linear-gradient(160deg, #0c0f15, #12161e)`,
+      border: "1px solid var(--border)",
+      borderTopColor: `rgba(${rgb}, 0.2)`,
+      boxShadow: `0 2px 8px rgba(0,0,0,0.3), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 20px rgba(${rgb}, 0.02)`,
+    }}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-1.5 select-none flex-shrink-0" style={{
+        background: `linear-gradient(180deg, rgba(${rgb}, 0.04) 0%, transparent 100%)`,
+        borderBottom: "1px solid var(--border)",
+      }}>
+        <div className="flex gap-1">
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: `rgba(255, 82, 82, 0.35)` }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: `rgba(255, 171, 64, 0.35)` }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: `rgba(0, 230, 118, 0.35)` }} />
+        </div>
+        <div className="w-px h-2.5 bg-[var(--border)]" />
+        <span className="text-[8px] opacity-40" dangerouslySetInnerHTML={{ __html: icon }} />
+        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{title}</span>
+      </div>
+      {/* Content */}
+      <div className="p-3">
+        {children}
       </div>
     </div>
   );
