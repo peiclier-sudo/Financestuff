@@ -40,7 +40,7 @@ export default function DayCharacteristics({ day, stats }: Props) {
       {/* Historical Stats */}
       <div>
         <h3 className="text-label mb-2">
-          Historical Match <span style={{ color: "var(--accent)" }}>({stats.sampleSize} days)</span>
+          Historical Match <span style={{ color: "var(--text-secondary)" }}>({stats.sampleSize} days)</span>
         </h3>
 
         {stats.sampleSize === 0 ? (
@@ -73,7 +73,7 @@ export default function DayCharacteristics({ day, stats }: Props) {
               <StatRow label="Med Change" value={`${stats.medianChangePercent >= 0 ? "+" : ""}${stats.medianChangePercent.toFixed(2)}%`} color={stats.medianChangePercent >= 0 ? "var(--green)" : "var(--red)"} />
               <StatRow label="Avg Range" value={`${stats.avgRangePercent.toFixed(2)}%`} />
               <StatRow label="Med Range" value={`${stats.medianRangePercent.toFixed(2)}%`} />
-              <StatRow label="Gap Fill" value={`${stats.gapFillPct.toFixed(0)}%`} color="var(--orange)" />
+              <StatRow label="Gap Fill" value={`${stats.gapFillPct.toFixed(0)}%`} color="var(--text-secondary)" />
             </div>
           </div>
         )}

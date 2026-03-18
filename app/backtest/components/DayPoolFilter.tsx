@@ -29,7 +29,7 @@ export default function DayPoolFilter({ filter, onChange, poolSize, totalSize }:
         {!isDefault && (
           <button
             onClick={() => onChange(DEFAULT_POOL_FILTER)}
-            className="text-[9px] text-[var(--accent)] hover:underline"
+            className="text-[9px] text-[var(--text)] hover:underline"
           >
             Reset
           </button>
@@ -91,7 +91,7 @@ export default function DayPoolFilter({ filter, onChange, poolSize, totalSize }:
       </div>
 
       <div className="text-[10px] text-[var(--text-muted)]">
-        Pool: <span className="font-semibold text-[var(--accent)]">{poolSize}</span> / {totalSize} days
+        Pool: <span className="font-semibold text-[var(--text)]">{poolSize}</span> / {totalSize} days
       </div>
     </div>
   );

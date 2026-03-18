@@ -20,22 +20,22 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
           backdropFilter: "blur(32px) saturate(1.4)",
           WebkitBackdropFilter: "blur(32px) saturate(1.4)",
           border: "1px solid rgba(255, 255, 255, 0.08)",
-          borderTopColor: "rgba(192, 132, 252, 0.25)",
-          boxShadow: "0 8px 64px rgba(0,0,0,0.6), 0 0 80px rgba(192, 132, 252, 0.04), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.15)",
+          borderTopColor: "rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 8px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.15)",
         }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{
-          background: "linear-gradient(180deg, rgba(192, 132, 252, 0.04) 0%, transparent 100%)",
+          background: "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%)",
           borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
         }}>
           <div className="flex gap-1.5">
-            <div className="w-[8px] h-[8px] rounded-full cursor-pointer hover:opacity-100" style={{ background: "rgba(255, 82, 82, 0.5)" }} onClick={onClose} />
-            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 171, 64, 0.35)" }} />
-            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(0, 230, 118, 0.35)" }} />
+            <div className="w-[8px] h-[8px] rounded-full cursor-pointer hover:opacity-100" style={{ background: "rgba(255, 255, 255, 0.2)" }} onClick={onClose} />
+            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.12)" }} />
+            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
           </div>
           <div className="w-px h-4 bg-[var(--border)]" />
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(192, 132, 252, 0.7)" }}>
+          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(255, 255, 255, 0.5)" }}>
             Performance Dashboard
           </span>
           <span className="text-[10px] text-[var(--text-dim)]">{trades.length} trades</span>
@@ -72,7 +72,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                 <MetricCard label="Losers" value={`${stats.losers}`} color="var(--red)" />
                 <MetricCard label="Best Trade" value={`+${stats.bestTrade.toFixed(1)}`} color="var(--green)" />
                 <MetricCard label="Worst Trade" value={stats.worstTrade.toFixed(1)} color="var(--red)" />
-                <MetricCard label="R:R Ratio" value={stats.avgWin > 0 && stats.avgLoss < 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : "—"} color="var(--accent)" />
+                <MetricCard label="R:R Ratio" value={stats.avgWin > 0 && stats.avgLoss < 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : "—"} color="var(--text)" />
               </div>
 
               {/* Charts Row */}

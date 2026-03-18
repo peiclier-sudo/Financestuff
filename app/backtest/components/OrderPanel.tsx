@@ -93,7 +93,7 @@ export default function OrderPanel({
         <button
           onClick={onExpandResults}
           className="absolute -top-1 -right-1 w-5 h-5 rounded flex items-center justify-center text-[9px] transition-all hover:scale-110"
-          style={{ background: "rgba(192, 132, 252, 0.15)", color: "rgba(192, 132, 252, 0.8)", border: "1px solid rgba(192, 132, 252, 0.2)" }}
+          style={{ background: "rgba(255, 255, 255, 0.08)", color: "rgba(255, 255, 255, 0.6)", border: "1px solid rgba(255, 255, 255, 0.12)" }}
           title="Expand performance dashboard"
         >
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -253,7 +253,7 @@ export default function OrderPanel({
           <div className="space-y-1">
             {pendingOrders.map((o) => (
               <div key={o.id} className="flex items-center gap-2 p-1.5 rounded-lg" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                <span className="text-[9px] font-semibold text-[var(--accent)] uppercase">{o.type}</span>
+                <span className="text-[9px] font-semibold text-[var(--text-secondary)] uppercase">{o.type}</span>
                 <span className="text-[10px] font-bold" style={{ color: o.direction === "long" ? "var(--green)" : "var(--red)" }}>
                   {o.direction === "long" ? "BUY" : "SELL"}
                 </span>
