@@ -311,12 +311,11 @@ export default function ReplayChart({
 
     // Set fixed time range for the entire day — only on new day load
     // This prevents the chart from re-zooming on every bar advance
+    // Use logical range (bar indices) so the chart reserves space for all bars
     const isDayChange = bars !== prevBarsRef.current;
     if (isDayChange || !timeRangeSetRef.current) {
       if (bars.length >= 2) {
-        const firstTime = bars[0].time as UTCTimestamp;
-        const lastTime = bars[bars.length - 1].time as UTCTimestamp;
-        chart.timeScale().setVisibleRange({ from: firstTime, to: lastTime });
+        chart.timeScale().setVisibleLogicalRange({ from: -1, to: bars.length });
         timeRangeSetRef.current = true;
         prevBarsRef.current = bars;
       } else {
