@@ -287,8 +287,8 @@ export default function ReplayChart({
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
-        lineWidth: 2,
-        lineStyle: 2, // dashed — smoother than solid for entries
+        lineWidth: 1,
+        lineStyle: 2,
         axisLabelVisible: true,
         title: "",
         axisLabelColor: pnlPts >= 0 ? "#3fb950" : "#f85149",
@@ -340,7 +340,7 @@ export default function ReplayChart({
       const slPl = series.createPriceLine({
         price: unifiedSL,
         color: "#f8514980",
-        lineWidth: 2,
+        lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
@@ -353,7 +353,7 @@ export default function ReplayChart({
       const tpPl = series.createPriceLine({
         price: unifiedTP,
         color: "#3fb95080",
-        lineWidth: 2,
+        lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
