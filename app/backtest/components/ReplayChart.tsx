@@ -580,9 +580,14 @@ export default function ReplayChart({
     if (!chart || !series || !containerRef.current) return;
 
     const rect = containerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     const clickPrice = series.coordinateToPrice(y);
     if (clickPrice === null) return;
+
+    // Ignore clicks on the price scale (Y axis) area to prevent accidental drags
+    const chartWidth = chart.timeScale().width();
+    if (x > chartWidth) return;
 
     const threshold = currentPrice * 0.001;
 
