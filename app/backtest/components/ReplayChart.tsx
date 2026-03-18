@@ -27,7 +27,8 @@ interface TradeLabel {
   time: number;
   price: number;
   text: string;
-  detail: string; // hover tooltip: breakdown of individual trades
+  direction: "long" | "short" | "mixed"; // dominant direction
+  trades: { pnl: number; text: string; direction: "long" | "short"; entryTime: number; entryPrice: number; exitPrice: number }[];
   color: string;
   bgColor: string;
   above: boolean;
@@ -280,16 +281,17 @@ export default function ReplayChart({
     const newPosLabels: typeof posLabels = [];
     positions.forEach((p) => {
       const mult = p.direction === "long" ? 1 : -1;
-      const pnl = (currentPrice - p.entryPrice) * mult;
-      const pnlColor = pnl >= 0 ? "#3fb95090" : "#f8514990";
+      const pnlPts = (currentPrice - p.entryPrice) * mult;
+      const pnl = pnlPts * tradingSize;
+      const pnlColor = pnlPts >= 0 ? "#3fb95090" : "#f8514990";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
-        lineWidth: 2,
-        lineStyle: 2, // dashed — smoother than solid for entries
+        lineWidth: 1,
+        lineStyle: 2,
         axisLabelVisible: true,
         title: "",
-        axisLabelColor: pnl >= 0 ? "#3fb950" : "#f85149",
+        axisLabelColor: pnlPts >= 0 ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
@@ -338,7 +340,7 @@ export default function ReplayChart({
       const slPl = series.createPriceLine({
         price: unifiedSL,
         color: "#f8514980",
-        lineWidth: 2,
+        lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
@@ -351,7 +353,7 @@ export default function ReplayChart({
       const tpPl = series.createPriceLine({
         price: unifiedTP,
         color: "#3fb95080",
-        lineWidth: 2,
+        lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "",
@@ -388,22 +390,50 @@ export default function ReplayChart({
       }
 
       // Create one label per exit group (merged)
-      for (const [, group] of exitGroups) {
+      for (const [exitIdx, group] of exitGroups) {
         const totalPnl = group.trades.reduce((s, t) => s + t.pnlPoints, 0);
         const color = totalPnl >= 0 ? "#3fb950" : "#f85149";
-        // Detail for hover: show each trade's PnL
-        const detail = group.trades.length > 1
-          ? group.trades.map((t) => `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`).join(" + ") + ` = ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`
-          : "";
+        const isAbove = totalPnl >= 0;
+
+        // Smart Y positioning: use a price offset away from candles
+        // Look at neighboring bars to find clear space
+        const bar = group.bar;
+        const neighborRange = 2; // check bars around
+        let maxHigh = bar.high;
+        let minLow = bar.low;
+        for (let ni = Math.max(0, exitIdx - neighborRange); ni <= Math.min(revealedBars.length - 1, exitIdx + neighborRange); ni++) {
+          maxHigh = Math.max(maxHigh, revealedBars[ni].high);
+          minLow = Math.min(minLow, revealedBars[ni].low);
+        }
+        const barRange = maxHigh - minLow;
+        const smartPrice = isAbove
+          ? maxHigh + barRange * 0.15
+          : minLow - barRange * 0.15;
+
+        // Determine dominant direction
+        const longs = group.trades.filter((t) => t.direction === "long").length;
+        const shorts = group.trades.length - longs;
+        const direction: "long" | "short" | "mixed" = group.trades.length === 1
+          ? group.trades[0].direction
+          : longs === group.trades.length ? "long" : shorts === group.trades.length ? "short" : "mixed";
+
         labels.push({
           id: `exit-${group.trades.map((t) => t.id).join("-")}`,
           time: group.bar.time,
-          price: totalPnl >= 0 ? group.bar.high : group.bar.low,
+          price: smartPrice,
           text: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`,
-          detail,
+          direction,
+          trades: group.trades.map((t) => ({
+            pnl: t.pnlPoints,
+            text: `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`,
+            direction: t.direction,
+            entryTime: t.entryTime,
+            entryPrice: t.entryPrice,
+            exitPrice: t.exitPrice,
+          })),
           color,
-          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
-          above: totalPnl >= 0,
+          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.08)" : "rgba(248, 81, 73, 0.08)",
+          above: isAbove,
         });
       }
     }
@@ -770,52 +800,79 @@ export default function ReplayChart({
         );
       })}
 
-      {/* Trade labels — discreet positioned HTML bubbles */}
+      {/* Trade PnL labels — positioned away from candles */}
       {tradeLabels.map((label) => {
         const pos = labelPositions.get(label.id);
         if (!pos) return null;
-        const offsetY = label.above ? -22 : 6;
+        const dirLetter = label.direction === "long" ? "L" : label.direction === "short" ? "S" : "M";
+        const dirColor = label.direction === "long" ? "#3fb950" : label.direction === "short" ? "#f85149" : "#7d8590";
         return (
           <div
             key={label.id}
+            data-label-id={label.id}
             className="absolute z-30 group/label"
             style={{
               left: pos.x,
-              top: pos.y + offsetY,
-              transform: "translateX(-50%)",
-              pointerEvents: label.detail ? "auto" : "none",
+              top: pos.y,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "auto",
             }}
           >
             <div
-              className="px-1.5 py-[1px] rounded-[4px] text-[8px] font-mono leading-tight whitespace-nowrap"
+              className="flex items-center gap-1 px-2 py-0.5 rounded-[5px] font-mono font-bold leading-tight whitespace-nowrap"
               style={{
+                fontSize: "11px",
                 color: label.color,
                 background: label.bgColor,
-                border: `1px solid ${label.color}18`,
-                backdropFilter: "blur(4px)",
+                border: `1px solid ${label.color}20`,
+                backdropFilter: "blur(8px)",
+                boxShadow: `0 0 10px ${label.color}10`,
+                textShadow: `0 0 6px ${label.color}30`,
               }}
             >
-              {label.text}
+              <span className="text-[9px] font-bold opacity-60" style={{ color: dirColor }}>{dirLetter}</span>
+              <span>{label.text}</span>
             </div>
-            {/* Hover detail for merged exits */}
-            {label.detail && (
-              <div
-                className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/label:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap"
-                style={{
-                  [label.above ? "bottom" : "top"]: "100%",
-                  marginBottom: label.above ? "4px" : undefined,
-                  marginTop: label.above ? undefined : "4px",
-                }}
-              >
-                <div className="px-2 py-1 rounded text-[7px] font-mono"
-                  style={{ background: "rgba(12, 15, 21, 0.9)", border: "1px solid rgba(255,255,255,0.08)", color: "#8b949e", backdropFilter: "blur(8px)" }}>
-                  {label.detail}
-                </div>
+            {/* Hover detail — entry→exit connectors + breakdown */}
+            <div
+              className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/label:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap"
+              style={{
+                [label.above ? "bottom" : "top"]: "100%",
+                marginBottom: label.above ? "6px" : undefined,
+                marginTop: label.above ? undefined : "6px",
+              }}
+            >
+              <div className="px-2.5 py-1.5 rounded-md text-[10px] font-mono font-semibold space-y-1"
+                style={{ background: "rgba(12, 15, 21, 0.94)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(12px)", boxShadow: "0 4px 20px rgba(0,0,0,0.4)" }}>
+                {label.trades.map((t, i) => {
+                  const tColor = t.pnl >= 0 ? "#3fb950" : "#f85149";
+                  const tDir = t.direction === "long" ? "L" : "S";
+                  return (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <span className="text-[8px] font-bold w-2" style={{ color: t.direction === "long" ? "#3fb950" : "#f85149" }}>{tDir}</span>
+                      <span className="text-[var(--text-dim)] text-[9px]">{t.entryPrice.toFixed(0)}</span>
+                      <span className="text-[var(--text-dim)] text-[7px]">&rarr;</span>
+                      <span className="text-[var(--text-dim)] text-[9px]">{t.exitPrice.toFixed(0)}</span>
+                      <span style={{ color: tColor }}>{t.text}</span>
+                    </div>
+                  );
+                })}
+                {label.trades.length > 1 && (
+                  <div className="flex items-center gap-1.5 pt-0.5" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                    <span className="text-[var(--text-dim)] text-[8px]">Total</span>
+                    <span className="ml-auto text-[11px]" style={{ color: label.color, textShadow: `0 0 6px ${label.color}40` }}>{label.text}</span>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         );
       })}
+
+      {/* Hover connectors — SVG lines from entry bar to exit bar (rendered at chart level) */}
+      {tradeLabels.map((label) => (
+        <TradeConnectors key={`conn-${label.id}`} label={label} revealedBars={revealedBars} chartRef={chartRef} seriesRef={seriesRef} containerRef={containerRef} labelId={label.id} />
+      ))}
 
       {/* Top-right overlay: Trading Size + ATR */}
       <div className="absolute top-2 right-16 z-40 flex items-center gap-2">
@@ -879,6 +936,98 @@ export default function ReplayChart({
         </div>
       )}
     </div>
+  );
+}
+
+function TradeConnectors({ label, revealedBars, chartRef, seriesRef, containerRef, labelId }: {
+  label: TradeLabel;
+  revealedBars: Bar[];
+  chartRef: React.RefObject<IChartApi | null>;
+  seriesRef: React.RefObject<ISeriesApi<"Candlestick"> | null>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  labelId: string;
+}) {
+  const [lines, setLines] = useState<{ x1: number; y1: number; x2: number; y2: number; color: string }[]>([]);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    if (!chart || !series) return;
+
+    const compute = () => {
+      const newLines: typeof lines = [];
+      for (const t of label.trades) {
+        const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
+        if (entryIdx < 0) continue;
+        const entryBar = revealedBars[entryIdx];
+        if (!entryBar) continue;
+
+        const x1 = chart.timeScale().timeToCoordinate(entryBar.time as UTCTimestamp);
+        const y1 = series.priceToCoordinate(t.entryPrice);
+        const x2 = chart.timeScale().timeToCoordinate(label.time as UTCTimestamp);
+        const y2 = series.priceToCoordinate(t.exitPrice);
+        if (x1 != null && y1 != null && x2 != null && y2 != null) {
+          newLines.push({
+            x1: x1 as number,
+            y1: y1 as number,
+            x2: x2 as number,
+            y2: y2 as number,
+            color: t.pnl >= 0 ? "#3fb950" : "#f85149",
+          });
+        }
+      }
+      setLines(newLines);
+    };
+
+    compute();
+    chart.timeScale().subscribeVisibleLogicalRangeChange(compute);
+    return () => {
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(compute); } catch {}
+    };
+  }, [label, revealedBars, chartRef, seriesRef]);
+
+  // Listen for hover on the corresponding label element
+  useEffect(() => {
+    const labelEl = document.querySelector(`[data-label-id="${labelId}"]`);
+    if (!labelEl) return;
+    const enter = () => setHovered(true);
+    const leave = () => setHovered(false);
+    labelEl.addEventListener("mouseenter", enter);
+    labelEl.addEventListener("mouseleave", leave);
+    return () => {
+      labelEl.removeEventListener("mouseenter", enter);
+      labelEl.removeEventListener("mouseleave", leave);
+    };
+  }, [labelId]);
+
+  if (lines.length === 0 || !hovered) return null;
+
+  const el = containerRef.current;
+  if (!el) return null;
+  const w = el.clientWidth;
+  const h = el.clientHeight;
+
+  return (
+    <svg
+      className="absolute pointer-events-none z-20 transition-opacity"
+      style={{ left: 0, top: 0, width: w, height: h, opacity: 1 }}
+    >
+      {lines.map((l, i) => (
+        <g key={i}>
+          {/* Soft glow line */}
+          <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={l.color} strokeWidth="4" opacity="0.08" strokeLinecap="round" />
+          {/* Main dashed line */}
+          <line x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke={l.color} strokeWidth="1.5" strokeDasharray="6,4" opacity="0.5" strokeLinecap="round" />
+          {/* Entry dot */}
+          <circle cx={l.x1} cy={l.y1} r="3.5" fill="none" stroke={l.color} strokeWidth="1.5" opacity="0.6" />
+          <circle cx={l.x1} cy={l.y1} r="1.5" fill={l.color} opacity="0.8" />
+          {/* Exit dot */}
+          <circle cx={l.x2} cy={l.y2} r="3.5" fill="none" stroke={l.color} strokeWidth="1.5" opacity="0.6" />
+          <circle cx={l.x2} cy={l.y2} r="1.5" fill={l.color} opacity="0.8" />
+        </g>
+      ))}
+    </svg>
   );
 }
 

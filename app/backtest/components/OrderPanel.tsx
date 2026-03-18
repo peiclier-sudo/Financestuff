@@ -16,6 +16,7 @@ interface Props {
   onUpdateAllSL: (sl: number | null) => void;
   onUpdateAllTP: (tp: number | null) => void;
   onExpandResults: () => void;
+  tradingSize: number;
 }
 
 export default function OrderPanel({
@@ -31,6 +32,7 @@ export default function OrderPanel({
   onUpdateAllSL,
   onUpdateAllTP,
   onExpandResults,
+  tradingSize,
 }: Props) {
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const currentPrice = currentBar?.close ?? 0;
@@ -49,10 +51,10 @@ export default function OrderPanel({
     ? sessionTrades.filter((t) => t.pnlPoints < 0).reduce((s, t) => s + t.pnlPoints, 0) / losers
     : 0;
 
-  // Unrealized P&L
+  // Unrealized P&L (factored by trading size)
   const unrealizedPnl = positions.reduce((sum, p) => {
     const mult = p.direction === "long" ? 1 : -1;
-    return sum + (currentPrice - p.entryPrice) * mult;
+    return sum + (currentPrice - p.entryPrice) * mult * tradingSize;
   }, 0);
 
   // Equity curve data points (cumulative PnL after each trade)
@@ -182,7 +184,7 @@ export default function OrderPanel({
           <div className="space-y-1">
             {positions.map((p) => {
               const mult = p.direction === "long" ? 1 : -1;
-              const pnl = (currentPrice - p.entryPrice) * mult;
+              const pnl = (currentPrice - p.entryPrice) * mult * tradingSize;
               return (
                 <div key={p.id} className="flex items-center gap-2 p-1.5 rounded-lg" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
                   <span className="text-[10px] font-bold" style={{ color: p.direction === "long" ? "var(--green)" : "var(--red)" }}>

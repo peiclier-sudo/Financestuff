@@ -653,6 +653,7 @@ export default function BacktestPage() {
                 onUpdateAllSL={handleUpdateAllSL}
                 onUpdateAllTP={handleUpdateAllTP}
                 onExpandResults={() => setShowPerformance(true)}
+                tradingSize={tradingSize}
               />
             </SidePanel>
           </div>
