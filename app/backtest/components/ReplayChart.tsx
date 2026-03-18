@@ -14,10 +14,12 @@ import { Order, Position, ClosedTrade } from "@/lib/backtestTypes";
 
 interface DragLine {
   id: string;
-  type: "sl" | "tp" | "entry";
+  type: "sl" | "tp" | "entry" | "entry-drag";
   positionId?: string;
   orderId?: string;
   price: number;
+  direction?: "long" | "short"; // for entry-drag: position direction
+  entryPrice?: number; // for entry-drag: original entry price
 }
 
 interface TradeLabel {
@@ -120,8 +122,8 @@ export default function ReplayChart({
       },
       crosshair: {
         mode: 0,
-        vertLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
-        horzLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
+        vertLine: { color: "#7d859080", width: 1, style: 2, labelBackgroundColor: "#2a2f3a" },
+        horzLine: { color: "#7d859080", width: 1, style: 2, labelBackgroundColor: "#2a2f3a" },
       },
       handleScroll: true,
       handleScale: true,
@@ -196,12 +198,12 @@ export default function ReplayChart({
     if (prevClose != null && revealedBars.length > 0) {
       const pl = series.createPriceLine({
         price: prevClose,
-        color: "#f0883e",
+        color: "#7d8590",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "Prev Close",
-        axisLabelColor: "#f0883e",
+        axisLabelColor: "#7d8590",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set("prevClose", pl);
@@ -226,12 +228,12 @@ export default function ReplayChart({
     orders.filter((o) => o.status === "pending").forEach((o) => {
       const entryPl = series.createPriceLine({
         price: o.price,
-        color: "#58a6ff",
+        color: "#ffffff80",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: `${o.direction === "long" ? "BUY" : "SELL"} ${o.type.toUpperCase()}`,
-        axisLabelColor: "#58a6ff",
+        axisLabelColor: "#ffffff80",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`order-entry-${o.id}`, entryPl);
@@ -557,6 +559,25 @@ export default function ReplayChart({
       }
     }
 
+    // Check position entry lines — drag to create SL/TP
+    for (const p of positions) {
+      if (Math.abs((clickPrice as number) - p.entryPrice) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
+        setDragging({
+          id: p.id,
+          type: "entry-drag",
+          positionId: p.id,
+          price: p.entryPrice,
+          direction: p.direction,
+          entryPrice: p.entryPrice,
+        });
+        e.preventDefault();
+        return;
+      }
+    }
+
     // Check order lines
     for (const o of orders.filter((o) => o.status === "pending")) {
       if (o.stopLoss != null && Math.abs((clickPrice as number) - o.stopLoss) < threshold) {
@@ -603,6 +624,29 @@ export default function ReplayChart({
     if (dragging.id === "unified") {
       if (dragging.type === "sl") onUpdateAllSL(newPrice);
       else if (dragging.type === "tp") onUpdateAllTP(newPrice);
+    } else if (dragging.type === "entry-drag" && dragging.positionId && dragging.entryPrice != null && dragging.direction) {
+      // Drag from entry line: direction determines SL vs TP
+      const isLong = dragging.direction === "long";
+      const draggedBelow = newPrice < dragging.entryPrice;
+      if (isLong) {
+        // Long: drag down = SL, drag up = TP
+        if (draggedBelow) {
+          onUpdatePositionSL(dragging.positionId, newPrice);
+          onUpdatePositionTP(dragging.positionId, null);
+        } else {
+          onUpdatePositionTP(dragging.positionId, newPrice);
+          onUpdatePositionSL(dragging.positionId, null);
+        }
+      } else {
+        // Short: drag up = SL, drag down = TP
+        if (draggedBelow) {
+          onUpdatePositionTP(dragging.positionId, newPrice);
+          onUpdatePositionSL(dragging.positionId, null);
+        } else {
+          onUpdatePositionSL(dragging.positionId, newPrice);
+          onUpdatePositionTP(dragging.positionId, null);
+        }
+      }
     } else if (dragging.positionId) {
       if (dragging.type === "sl") onUpdatePositionSL(dragging.positionId, newPrice);
       else if (dragging.type === "tp") onUpdatePositionTP(dragging.positionId, newPrice);
@@ -699,7 +743,7 @@ export default function ReplayChart({
               onClick={() => onTradingSizeChange(s)}
               className="text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors"
               style={{
-                background: tradingSize === s ? "var(--accent)" : "transparent",
+                background: tradingSize === s ? "rgba(255, 255, 255, 0.85)" : "transparent",
                 color: tradingSize === s ? "#0d1117" : "#7d8590",
               }}
             >{s}</button>
@@ -736,11 +780,11 @@ export default function ReplayChart({
       {dragging && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-50 text-[9px] font-mono px-2 py-0.5 rounded-full"
           style={{
-            background: dragging.type === "sl" ? "var(--red-dim)" : dragging.type === "tp" ? "var(--green-dim)" : "var(--accent-dim)",
-            color: dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : "var(--accent)",
-            border: `1px solid ${dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : "var(--accent)"}40`,
+            background: dragging.type === "sl" ? "var(--red-dim)" : dragging.type === "tp" ? "var(--green-dim)" : dragging.type === "entry-drag" ? (dragging.direction === "long" ? "var(--green-dim)" : "var(--red-dim)") : "var(--surface-2)",
+            color: dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : dragging.type === "entry-drag" ? "var(--text)" : "var(--text-secondary)",
+            border: `1px solid ${dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : "rgba(255,255,255,0.15)"}`,
           }}>
-          Dragging {dragging.type.toUpperCase()}{dragging.id === "unified" ? " (all)" : ""}
+          {dragging.type === "entry-drag" ? "Drag to set SL/TP" : `Dragging ${dragging.type.toUpperCase()}`}{dragging.id === "unified" ? " (all)" : ""}
         </div>
       )}
     </div>

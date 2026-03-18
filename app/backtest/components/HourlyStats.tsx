@@ -29,7 +29,7 @@ export default function HourlyStats({ buckets }: Props) {
                 b.bullishPct < 45 ? "var(--red)" :
                 "var(--text-secondary)";
               const rangeColor =
-                b.avgRangePct > 0.4 ? "var(--orange)" :
+                b.avgRangePct > 0.4 ? "var(--text)" :
                 b.avgRangePct > 0.25 ? "var(--text-secondary)" :
                 "var(--text-dim)";
 

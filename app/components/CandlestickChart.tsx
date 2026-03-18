@@ -63,8 +63,8 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       },
       crosshair: {
         mode: 0,
-        vertLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
-        horzLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
+        vertLine: { color: "#7d859080", width: 1, style: 2, labelBackgroundColor: "#2a2f3a" },
+        horzLine: { color: "#7d859080", width: 1, style: 2, labelBackgroundColor: "#2a2f3a" },
       },
     });
 
@@ -93,7 +93,7 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
     // Previous close horizontal line
     if (showPrevClose && prevClose != null && bars.length >= 2) {
       const lineSeries = chart.addSeries(LineSeries, {
-        color: "#f0883e",
+        color: "#7d8590",
         lineWidth: 1,
         lineStyle: 2,
         priceLineVisible: false,
@@ -106,12 +106,12 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       ]);
       lineSeries.createPriceLine({
         price: prevClose,
-        color: "#f0883e",
+        color: "#7d8590",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: "Prev Close",
-        axisLabelColor: "#f0883e",
+        axisLabelColor: "#7d8590",
         axisLabelTextColor: "#0d1117",
       });
     }
@@ -120,7 +120,7 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
     if (showRange && range) {
       // High line
       const highLine = chart.addSeries(LineSeries, {
-        color: "#8b5cf680",
+        color: "#a0aabe80",
         lineWidth: 1,
         lineStyle: 2,
         priceLineVisible: false,
@@ -133,18 +133,18 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       ]);
       highLine.createPriceLine({
         price: range.high,
-        color: "#8b5cf6",
+        color: "#a0aabe",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: `Rng H`,
-        axisLabelColor: "#8b5cf6",
+        axisLabelColor: "#a0aabe",
         axisLabelTextColor: "#0d1117",
       });
 
       // Low line
       const lowLine = chart.addSeries(LineSeries, {
-        color: "#8b5cf680",
+        color: "#a0aabe80",
         lineWidth: 1,
         lineStyle: 2,
         priceLineVisible: false,
@@ -157,12 +157,12 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       ]);
       lowLine.createPriceLine({
         price: range.low,
-        color: "#8b5cf6",
+        color: "#a0aabe",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: `Rng L`,
-        axisLabelColor: "#8b5cf6",
+        axisLabelColor: "#a0aabe",
         axisLabelTextColor: "#0d1117",
       });
     }
@@ -174,7 +174,7 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
 
       // Entry line
       const entryLine = chart.addSeries(LineSeries, {
-        color: "#58a6ff80",
+        color: "#ffffff50",
         lineWidth: 1,
         lineStyle: 2,
         priceLineVisible: false,
@@ -187,12 +187,12 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
       ]);
       entryLine.createPriceLine({
         price: trade.entryPrice,
-        color: "#58a6ff",
+        color: "#ffffff80",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
         title: `Entry`,
-        axisLabelColor: "#58a6ff",
+        axisLabelColor: "#ffffff80",
         axisLabelTextColor: "#0d1117",
       });
 
@@ -282,7 +282,7 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
           {
             time: bars[entryIdx].time as TS,
             position: trade.direction === "long" ? "belowBar" : "aboveBar",
-            color: "#58a6ff",
+            color: "#ffffff80",
             shape: trade.direction === "long" ? "arrowUp" : "arrowDown",
             text: `${trade.direction === "long" ? "BUY" : "SELL"} ${trade.entryPrice.toFixed(1)}`,
           },
@@ -334,9 +334,9 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
                   type="checkbox"
                   checked={showRange}
                   onChange={(e) => setShowRange(e.target.checked)}
-                  className="w-3 h-3 accent-[#8b5cf6]"
+                  className="w-3 h-3 accent-[#a0aabe]"
                 />
-                <span style={{ color: "#8b5cf6" }}>Range ({range.label})</span>
+                <span style={{ color: "#a0aabe" }}>Range ({range.label})</span>
               </label>
             )}
             {trade && (
@@ -345,9 +345,9 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
                   type="checkbox"
                   checked={showTrade}
                   onChange={(e) => setShowTrade(e.target.checked)}
-                  className="w-3 h-3 accent-[#58a6ff]"
+                  className="w-3 h-3 accent-[#ffffff80]"
                 />
-                <span style={{ color: "#58a6ff" }}>Trade</span>
+                <span style={{ color: "#ffffff80" }}>Trade</span>
               </label>
             )}
             {prevClose != null && (
@@ -356,9 +356,9 @@ export default function CandlestickChart({ bars, title, prevClose, range, trade 
                   type="checkbox"
                   checked={showPrevClose}
                   onChange={(e) => setShowPrevClose(e.target.checked)}
-                  className="w-3 h-3 accent-[#f0883e]"
+                  className="w-3 h-3 accent-[#7d8590]"
                 />
-                <span style={{ color: "#f0883e" }}>Prev Close</span>
+                <span style={{ color: "#7d8590" }}>Prev Close</span>
               </label>
             )}
           </div>

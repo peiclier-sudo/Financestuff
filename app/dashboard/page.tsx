@@ -331,10 +331,7 @@ export default function Home() {
         <header className="flex items-center justify-between px-1">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
-              <div className="relative">
-                <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
-                <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--accent)] animate-ping opacity-30" />
-              </div>
+              <div className="w-2 h-2 rounded-full glow-dot" style={{ background: "rgba(255,255,255,0.6)", color: "rgba(255,255,255,0.6)" }} />
               <h1 className="font-display text-sm font-bold tracking-tight text-gradient-accent">NDX Day Filter</h1>
             </div>
             <div className="flex items-center gap-2">
@@ -345,7 +342,7 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={handleResetLayout} className="text-[8px] text-[var(--text-dim)] hover:text-[var(--accent)] uppercase tracking-widest transition-colors px-2 py-0.5 rounded hover:bg-[var(--accent)]/5">Reset Layout</button>
+            <button onClick={handleResetLayout} className="text-[8px] text-[var(--text-dim)] hover:text-white uppercase tracking-widest transition-colors px-2 py-0.5 rounded hover:bg-white/5">Reset Layout</button>
             <div className="w-px h-3 bg-[var(--border)]" />
             <span className="text-[8px] text-[var(--text-dim)] tracking-widest uppercase opacity-50">drag to move</span>
           </div>
@@ -448,9 +445,9 @@ export default function Home() {
 // ══════════════════════════════════════════════════════════
 
 const PANEL_ACCENT: Record<string, string> = {
-  daylist: "96, 165, 250",
-  chart: "0, 230, 118",
-  strategy: "192, 132, 252",
+  daylist: "160, 170, 190",
+  chart: "160, 170, 190",
+  strategy: "160, 170, 190",
 };
 
 function Panel({ id, children, tabs, isResizing, widthPercent }: { id: string; children: React.ReactNode; tabs?: React.ReactNode; isResizing?: boolean; widthPercent?: number }) {
@@ -472,9 +469,9 @@ function Panel({ id, children, tabs, isResizing, widthPercent }: { id: string; c
       }}>
         {/* Window dots */}
         <div className="flex gap-1.5">
-          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 82, 82, 0.35)` }} />
-          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 171, 64, 0.35)` }} />
-          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(0, 230, 118, 0.35)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 255, 255, 0.12)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 255, 255, 0.08)` }} />
+          <div className="w-[8px] h-[8px] rounded-full" style={{ background: `rgba(255, 255, 255, 0.05)` }} />
         </div>
         <div className="w-px h-3 bg-[var(--border)]" />
         <span className="text-[9px] opacity-40">{PANEL_ICONS[id]}</span>

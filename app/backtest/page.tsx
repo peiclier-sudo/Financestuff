@@ -432,7 +432,7 @@ export default function BacktestPage() {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-6 h-6 border-2 border-[var(--accent)] border-t-transparent rounded-full mx-auto mb-3" />
+          <div className="animate-spin w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full mx-auto mb-3" />
           <p className="text-[var(--text-muted)] text-sm">Loading NASDAQ data...</p>
         </div>
       </div>
@@ -454,13 +454,13 @@ export default function BacktestPage() {
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Top Bar */}
       <div className="flex-shrink-0 px-3 py-2 flex items-center gap-3" style={{ background: "rgba(12, 15, 21, 0.6)", backdropFilter: "blur(16px) saturate(1.3)", borderBottom: "1px solid rgba(255, 255, 255, 0.04)" }}>
-        <Link href="/" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors">
+        <Link href="/" className="text-[10px] text-[var(--text-dim)] hover:text-white transition-colors">
           &larr; Home
         </Link>
         <div className="w-px h-4 bg-[var(--border)]" />
 
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full glow-dot" style={{ background: "var(--green)", color: "var(--green)" }} />
+          <div className="w-2 h-2 rounded-full glow-dot" style={{ background: "rgba(255,255,255,0.6)", color: "rgba(255,255,255,0.6)" }} />
           <h1 className="font-display text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
         </div>
 
@@ -472,7 +472,7 @@ export default function BacktestPage() {
 
         <button
           onClick={() => setShowFilter((f) => !f)}
-          className={`text-[10px] py-1 px-2 rounded transition-colors ${showFilter ? "text-[var(--accent)] bg-[var(--accent)]/10" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}
+          className={`text-[10px] py-1 px-2 rounded transition-colors ${showFilter ? "text-white bg-white/10" : "text-[var(--text-dim)] hover:text-[var(--text-muted)]"}`}
         >
           Filter
         </button>
@@ -484,7 +484,7 @@ export default function BacktestPage() {
               {revealedBarCount}/{currentDay.bars.length} ({progress}%)
             </span>
             {dayComplete && (
-              <span className="text-[10px] font-semibold text-[var(--orange)]">Day Complete</span>
+              <span className="text-[10px] font-semibold text-[var(--text)]">Day Complete</span>
             )}
           </>
         )}
@@ -569,11 +569,11 @@ export default function BacktestPage() {
                 onClick={advanceBar}
                 className="font-display px-6 py-2.5 rounded-lg text-xs font-bold tracking-wide transition-all hover:scale-105 active:scale-95"
                 style={{
-                  background: "linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(88, 166, 255, 0.06))",
-                  color: "#58a6ff",
-                  border: "1px solid rgba(88, 166, 255, 0.25)",
+                  background: "linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03))",
+                  color: "rgba(255, 255, 255, 0.8)",
+                  border: "1px solid rgba(255, 255, 255, 0.15)",
                   backdropFilter: "blur(12px)",
-                  boxShadow: "0 0 20px rgba(88, 166, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.05)",
+                  boxShadow: "0 0 20px rgba(255, 255, 255, 0.04), inset 0 1px 0 rgba(255,255,255,0.05)",
                 }}
               >
                 Next &rarr;
@@ -614,7 +614,7 @@ export default function BacktestPage() {
           <div className="p-2 space-y-2 panel-focus-group">
             {/* Pool Filter (collapsible) */}
             {showFilter && (
-              <SidePanel icon="&#9881;" title="Pool Filter" rgb="96, 165, 250">
+              <SidePanel icon="&#9881;" title="Pool Filter" rgb="160, 170, 190">
                 <DayPoolFilter
                   filter={poolFilter}
                   onChange={setPoolFilter}
@@ -626,20 +626,20 @@ export default function BacktestPage() {
 
             {/* Day Characteristics & Stats */}
             {currentDay && (
-              <SidePanel icon="&#9733;" title="Day Analysis" rgb="255, 171, 64">
+              <SidePanel icon="&#9733;" title="Day Analysis" rgb="160, 170, 190">
                 <DayCharacteristics day={currentDay} stats={signatureStats} />
               </SidePanel>
             )}
 
             {/* Hourly Stats */}
             {currentDay && signatureStats.sampleSize > 0 && (
-              <SidePanel icon="&#9201;" title="Hourly Stats" rgb="0, 230, 118">
+              <SidePanel icon="&#9201;" title="Hourly Stats" rgb="160, 170, 190">
                 <HourlyStats buckets={signatureStats.hourlyBuckets} />
               </SidePanel>
             )}
 
             {/* Orders & Trades */}
-            <SidePanel icon="&#9670;" title="Trading" rgb="192, 132, 252">
+            <SidePanel icon="&#9670;" title="Trading" rgb="160, 170, 190">
               <OrderPanel
                 orders={orders}
                 positions={positions}
@@ -690,9 +690,9 @@ function SidePanel({ icon, title, rgb, children }: { icon: string; title: string
         borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
       }}>
         <div className="flex gap-1">
-          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 82, 82, 0.3)" }} />
-          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 171, 64, 0.3)" }} />
-          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(0, 230, 118, 0.3)" }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.12)" }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.08)" }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.05)" }} />
         </div>
         <div className="w-px h-2.5" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
         <span className="text-[8px] opacity-35" dangerouslySetInnerHTML={{ __html: icon }} />

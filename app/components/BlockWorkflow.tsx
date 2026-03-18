@@ -817,7 +817,7 @@ function ResultsPanel({ result, showTrades, onToggleTrades, onExpand }: {
 
   return (
     <div className="glass-panel-sm flex flex-col fade-in">
-      <div className="px-2.5 py-1.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0" style={{ background: "linear-gradient(180deg, rgba(96, 165, 250, 0.06) 0%, transparent 100%)" }}>
+      <div className="px-2.5 py-1.5 border-b border-[var(--border)] flex items-center justify-between flex-shrink-0" style={{ background: "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%)" }}>
         <div className="flex items-center gap-1.5">
           <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_6px_var(--accent)]" />
           <span className="font-semibold text-[var(--accent)] text-[10px] tracking-wide">Results</span>
