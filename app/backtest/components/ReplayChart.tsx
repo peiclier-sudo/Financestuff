@@ -4,12 +4,9 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import {
   createChart,
   CandlestickSeries,
-  LineSeries,
-  createSeriesMarkers,
   type IChartApi,
   type ISeriesApi,
   type UTCTimestamp,
-  type SeriesMarker,
   type IPriceLine,
 } from "lightweight-charts";
 import { Bar } from "@/lib/types";
@@ -21,6 +18,16 @@ interface DragLine {
   positionId?: string;
   orderId?: string;
   price: number;
+}
+
+interface TradeLabel {
+  id: string;
+  time: number;
+  price: number;
+  text: string;
+  color: string;
+  bgColor: string;
+  above: boolean; // above or below the bar
 }
 
 interface Props {
@@ -66,10 +73,10 @@ export default function ReplayChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const markersRef = useRef<any>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; price: number } | null>(null);
   const [dragging, setDragging] = useState<DragLine | null>(null);
+  const [tradeLabels, setTradeLabels] = useState<TradeLabel[]>([]);
+  const [labelPositions, setLabelPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
   const lastCrosshairPrice = useRef<number>(0);
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
@@ -131,7 +138,6 @@ export default function ReplayChart({
       wickDownColor: "#f8514980",
     });
     seriesRef.current = series;
-    markersRef.current = createSeriesMarkers(series, []);
 
     // Track crosshair price for order placement
     chart.subscribeCrosshairMove((param) => {
@@ -161,7 +167,6 @@ export default function ReplayChart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
-      markersRef.current = null;
       timeRangeSetRef.current = false;
     };
   }, []);
@@ -338,8 +343,8 @@ export default function ReplayChart({
       priceLinesRef.current.set("unified-tp", tpPl);
     }
 
-    // Closed trade markers — only show trades whose times fall within current day's bar range
-    const markers: SeriesMarker<UTCTimestamp>[] = [];
+    // Compute trade labels for HTML overlay (replaces built-in markers)
+    const labels: TradeLabel[] = [];
     if (closedTrades.length > 0 && revealedBars.length > 0) {
       const dayStart = bars[0].time;
       const dayEnd = bars[bars.length - 1].time;
@@ -348,28 +353,44 @@ export default function ReplayChart({
         const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
         const exitIdx = findClosestBarIndex(revealedBars, t.exitTime);
         if (entryIdx >= 0 && exitIdx >= 0 && exitIdx < revealedBars.length) {
-          markers.push({
-            time: revealedBars[entryIdx].time as UTCTimestamp,
-            position: t.direction === "long" ? "belowBar" : "aboveBar",
-            color: "#58a6ff",
-            shape: t.direction === "long" ? "arrowUp" : "arrowDown",
-            text: `${t.direction === "long" ? "B" : "S"} ${t.entryPrice.toFixed(0)}`,
+          const entryBar = revealedBars[entryIdx];
+          const exitBar = revealedBars[exitIdx];
+          // Entry label
+          labels.push({
+            id: `entry-${t.id}`,
+            time: entryBar.time,
+            price: t.direction === "long" ? entryBar.low : entryBar.high,
+            text: `${t.entryPrice.toFixed(0)}`,
+            color: "#8b949e",
+            bgColor: "rgba(22, 27, 34, 0.85)",
+            above: t.direction === "short",
           });
+          // Exit label
           const exitColor = t.pnlPoints >= 0 ? "#3fb950" : "#f85149";
-          markers.push({
-            time: revealedBars[exitIdx].time as UTCTimestamp,
-            position: t.direction === "long" ? "aboveBar" : "belowBar",
-            color: exitColor,
-            shape: "circle",
+          labels.push({
+            id: `exit-${t.id}`,
+            time: exitBar.time,
+            price: t.direction === "long" ? exitBar.high : exitBar.low,
             text: `${t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}`,
+            color: exitColor,
+            bgColor: t.pnlPoints >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
+            above: t.direction === "long",
           });
         }
       }
-      markers.sort((a, b) => (a.time as number) - (b.time as number));
     }
-    if (markersRef.current) {
-      markersRef.current.setMarkers(markers);
+    setTradeLabels(labels);
+
+    // Update label pixel positions
+    const newPositions = new Map<string, { x: number; y: number }>();
+    for (const label of labels) {
+      const x = chart.timeScale().timeToCoordinate(label.time as UTCTimestamp);
+      const y = series.priceToCoordinate(label.price);
+      if (x !== null && y !== null) {
+        newPositions.set(label.id, { x: x as number, y: y as number });
+      }
     }
+    setLabelPositions(newPositions);
 
     // Set fixed time range for the entire day — only on new day load
     const firstBarTime = bars.length > 0 ? bars[0].time : 0;
@@ -423,6 +444,31 @@ export default function ReplayChart({
       }
     }
   }, [revealedBars, prevClose, orders, positions, closedTrades, bars, unifiedSL, unifiedTP]);
+
+  // Re-position HTML labels when chart scrolls/zooms
+  useEffect(() => {
+    const chart = chartRef.current;
+    const series = seriesRef.current;
+    if (!chart || !series || tradeLabels.length === 0) return;
+
+    const updatePositions = () => {
+      const newPos = new Map<string, { x: number; y: number }>();
+      for (const label of tradeLabels) {
+        const x = chart.timeScale().timeToCoordinate(label.time as UTCTimestamp);
+        const y = series.priceToCoordinate(label.price);
+        if (x !== null && y !== null) {
+          newPos.set(label.id, { x: x as number, y: y as number });
+        }
+      }
+      setLabelPositions(newPos);
+    };
+
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updatePositions);
+
+    return () => {
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updatePositions); } catch {}
+    };
+  }, [tradeLabels]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -602,6 +648,36 @@ export default function ReplayChart({
         onMouseLeave={handleMouseUp}
         style={{ cursor: dragging ? "ns-resize" : "crosshair" }}
       />
+
+      {/* Trade labels — discreet positioned HTML bubbles */}
+      {tradeLabels.map((label) => {
+        const pos = labelPositions.get(label.id);
+        if (!pos) return null;
+        const offsetY = label.above ? -22 : 6;
+        return (
+          <div
+            key={label.id}
+            className="absolute z-30 pointer-events-none"
+            style={{
+              left: pos.x,
+              top: pos.y + offsetY,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <div
+              className="px-1.5 py-[1px] rounded-[4px] text-[8px] font-mono leading-tight whitespace-nowrap"
+              style={{
+                color: label.color,
+                background: label.bgColor,
+                border: `1px solid ${label.color}18`,
+                backdropFilter: "blur(4px)",
+              }}
+            >
+              {label.text}
+            </div>
+          </div>
+        );
+      })}
 
       {/* Top-right overlay: Trading Size + ATR */}
       <div className="absolute top-2 right-16 z-40 flex items-center gap-2">
