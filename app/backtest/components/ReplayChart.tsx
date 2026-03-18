@@ -56,6 +56,8 @@ export default function ReplayChart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersRef = useRef<any>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; price: number } | null>(null);
   const [dragging, setDragging] = useState<DragLine | null>(null);
@@ -109,6 +111,7 @@ export default function ReplayChart({
       wickDownColor: "#f8514980",
     });
     seriesRef.current = series;
+    markersRef.current = createSeriesMarkers(series, []);
 
     // Track crosshair price for order placement
     chart.subscribeCrosshairMove((param) => {
@@ -138,6 +141,7 @@ export default function ReplayChart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      markersRef.current = null;
       timeRangeSetRef.current = false;
     };
   }, []);
@@ -311,8 +315,10 @@ export default function ReplayChart({
       }
       markers.sort((a, b) => (a.time as number) - (b.time as number));
     }
-    // Always call to clear stale markers when switching days
-    createSeriesMarkers(series, markers);
+    // Update markers (setMarkers replaces all existing markers)
+    if (markersRef.current) {
+      markersRef.current.setMarkers(markers);
+    }
 
     // Set fixed time range for the entire day — only on new day load
     const firstBarTime = bars.length > 0 ? bars[0].time : 0;
