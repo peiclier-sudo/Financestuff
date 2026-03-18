@@ -274,14 +274,17 @@ export default function ReplayChart({
     const hasUnifiedTP = tpValues.size === 1 && positions.length > 1 && positions.every((p) => p.takeProfit != null);
 
     positions.forEach((p) => {
-      // Entry
+      // Entry — show direction + unrealized P&L
+      const mult = p.direction === "long" ? 1 : -1;
+      const pnl = (currentPrice - p.entryPrice) * mult;
+      const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}`;
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: p.direction === "long" ? "#3fb950" : "#f85149",
         lineWidth: 1,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: p.direction === "long" ? "L" : "S",
+        title: `${p.direction === "long" ? "L" : "S"} ${pnlStr}`,
         axisLabelColor: p.direction === "long" ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
@@ -628,23 +631,27 @@ export default function ReplayChart({
       // Drag from entry line: direction determines SL vs TP
       const isLong = dragging.direction === "long";
       const draggedBelow = newPrice < dragging.entryPrice;
+      // Use unified updates when multiple positions exist, individual otherwise
+      const useUnified = positions.length > 1;
+      const updateSL = useUnified ? onUpdateAllSL : (price: number | null) => onUpdatePositionSL(dragging.positionId!, price);
+      const updateTP = useUnified ? onUpdateAllTP : (price: number | null) => onUpdatePositionTP(dragging.positionId!, price);
       if (isLong) {
         // Long: drag down = SL, drag up = TP
         if (draggedBelow) {
-          onUpdatePositionSL(dragging.positionId, newPrice);
-          onUpdatePositionTP(dragging.positionId, null);
+          updateSL(newPrice);
+          updateTP(null);
         } else {
-          onUpdatePositionTP(dragging.positionId, newPrice);
-          onUpdatePositionSL(dragging.positionId, null);
+          updateTP(newPrice);
+          updateSL(null);
         }
       } else {
         // Short: drag up = SL, drag down = TP
         if (draggedBelow) {
-          onUpdatePositionTP(dragging.positionId, newPrice);
-          onUpdatePositionSL(dragging.positionId, null);
+          updateTP(newPrice);
+          updateSL(null);
         } else {
-          onUpdatePositionSL(dragging.positionId, newPrice);
-          onUpdatePositionTP(dragging.positionId, null);
+          updateSL(newPrice);
+          updateTP(null);
         }
       }
     } else if (dragging.positionId) {
@@ -655,7 +662,7 @@ export default function ReplayChart({
       else if (dragging.type === "tp") onUpdateOrderTP(dragging.orderId, newPrice);
       else if (dragging.type === "entry") onUpdateOrderPrice(dragging.orderId, newPrice);
     }
-  }, [dragging, onUpdatePositionSL, onUpdatePositionTP, onUpdateAllSL, onUpdateAllTP, onUpdateOrderSL, onUpdateOrderTP, onUpdateOrderPrice]);
+  }, [dragging, positions, onUpdatePositionSL, onUpdatePositionTP, onUpdateAllSL, onUpdateAllTP, onUpdateOrderSL, onUpdateOrderTP, onUpdateOrderPrice]);
 
   const handleMouseUp = useCallback(() => {
     if (dragging) {

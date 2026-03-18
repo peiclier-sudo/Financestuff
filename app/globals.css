@@ -382,15 +382,28 @@ body::before {
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
-/* ── Focus-aware transparency ──
-   When hovering one panel, siblings fade to create depth */
+/* ── Focus-aware transparency + hover zoom ──
+   When hovering one panel, siblings fade and hovered panel zooms for clarity */
 .panel-focus-group:has(.panel-focus:hover) .panel-focus:not(:hover) {
-  opacity: 0.5;
-  filter: brightness(0.75) saturate(0.8);
+  opacity: 0.35;
+  filter: brightness(0.7) saturate(0.7);
+  transform: scale(0.98);
 }
 .panel-focus {
-  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
-              filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              filter 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+              z-index 0s;
+  transform-origin: center center;
+  position: relative;
+}
+.panel-focus:hover {
+  transform: scale(1.03);
+  z-index: 10;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════
