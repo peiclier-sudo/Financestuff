@@ -281,8 +281,9 @@ export default function ReplayChart({
     const newPosLabels: typeof posLabels = [];
     positions.forEach((p) => {
       const mult = p.direction === "long" ? 1 : -1;
-      const pnl = (currentPrice - p.entryPrice) * mult;
-      const pnlColor = pnl >= 0 ? "#3fb95090" : "#f8514990";
+      const pnlPts = (currentPrice - p.entryPrice) * mult;
+      const pnl = pnlPts * tradingSize;
+      const pnlColor = pnlPts >= 0 ? "#3fb95090" : "#f8514990";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
@@ -290,7 +291,7 @@ export default function ReplayChart({
         lineStyle: 2, // dashed — smoother than solid for entries
         axisLabelVisible: true,
         title: "",
-        axisLabelColor: pnl >= 0 ? "#3fb950" : "#f85149",
+        axisLabelColor: pnlPts >= 0 ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
