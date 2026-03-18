@@ -397,7 +397,10 @@ export default function ReplayChart({
     const isDayChange = firstBarTime !== prevFirstBarTime.current;
     if (isDayChange || !timeRangeSetRef.current) {
       if (bars.length >= 2) {
-        chart.timeScale().setVisibleLogicalRange({ from: -1, to: bars.length });
+        // Place the first candle at ~35% of chart width (not far left)
+        const totalBars = bars.length;
+        const leftPad = Math.round(totalBars * 0.35 / 0.65);
+        chart.timeScale().setVisibleLogicalRange({ from: -leftPad, to: totalBars });
 
         // Set a reasonable initial price range so the first candle isn't full-height.
         // Use the full day's high/low with margin to set the price scale.
