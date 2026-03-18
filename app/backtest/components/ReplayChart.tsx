@@ -27,7 +27,7 @@ interface TradeLabel {
   time: number;
   price: number;
   text: string;
-  detail: string; // hover tooltip: breakdown of individual trades
+  trades: { pnl: number; text: string }[]; // individual trades for hover detail
   color: string;
   bgColor: string;
   above: boolean;
@@ -388,22 +388,38 @@ export default function ReplayChart({
       }
 
       // Create one label per exit group (merged)
-      for (const [, group] of exitGroups) {
+      for (const [exitIdx, group] of exitGroups) {
         const totalPnl = group.trades.reduce((s, t) => s + t.pnlPoints, 0);
         const color = totalPnl >= 0 ? "#3fb950" : "#f85149";
-        // Detail for hover: show each trade's PnL
-        const detail = group.trades.length > 1
-          ? group.trades.map((t) => `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`).join(" + ") + ` = ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`
-          : "";
+        const isAbove = totalPnl >= 0;
+
+        // Smart Y positioning: use a price offset away from candles
+        // Look at neighboring bars to find clear space
+        const bar = group.bar;
+        const neighborRange = 2; // check bars around
+        let maxHigh = bar.high;
+        let minLow = bar.low;
+        for (let ni = Math.max(0, exitIdx - neighborRange); ni <= Math.min(revealedBars.length - 1, exitIdx + neighborRange); ni++) {
+          maxHigh = Math.max(maxHigh, revealedBars[ni].high);
+          minLow = Math.min(minLow, revealedBars[ni].low);
+        }
+        const barRange = maxHigh - minLow;
+        const smartPrice = isAbove
+          ? maxHigh + barRange * 0.15
+          : minLow - barRange * 0.15;
+
         labels.push({
           id: `exit-${group.trades.map((t) => t.id).join("-")}`,
           time: group.bar.time,
-          price: totalPnl >= 0 ? group.bar.high : group.bar.low,
+          price: smartPrice,
           text: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`,
-          detail,
+          trades: group.trades.map((t) => ({
+            pnl: t.pnlPoints,
+            text: `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`,
+          })),
           color,
-          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
-          above: totalPnl >= 0,
+          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.08)" : "rgba(248, 81, 73, 0.08)",
+          above: isAbove,
         });
       }
     }
@@ -770,46 +786,56 @@ export default function ReplayChart({
         );
       })}
 
-      {/* Trade labels — discreet positioned HTML bubbles */}
+      {/* Trade PnL labels — positioned away from candles */}
       {tradeLabels.map((label) => {
         const pos = labelPositions.get(label.id);
         if (!pos) return null;
-        const offsetY = label.above ? -22 : 6;
+        const hasDetail = label.trades.length > 1;
         return (
           <div
             key={label.id}
             className="absolute z-30 group/label"
             style={{
               left: pos.x,
-              top: pos.y + offsetY,
-              transform: "translateX(-50%)",
-              pointerEvents: label.detail ? "auto" : "none",
+              top: pos.y,
+              transform: "translate(-50%, -50%)",
+              pointerEvents: hasDetail ? "auto" : "none",
             }}
           >
             <div
-              className="px-1.5 py-[1px] rounded-[4px] text-[8px] font-mono leading-tight whitespace-nowrap"
+              className="px-2 py-0.5 rounded-[5px] font-mono font-bold leading-tight whitespace-nowrap"
               style={{
+                fontSize: "11px",
                 color: label.color,
                 background: label.bgColor,
-                border: `1px solid ${label.color}18`,
-                backdropFilter: "blur(4px)",
+                border: `1px solid ${label.color}20`,
+                backdropFilter: "blur(8px)",
+                boxShadow: `0 0 10px ${label.color}10`,
+                textShadow: `0 0 6px ${label.color}30`,
               }}
             >
               {label.text}
             </div>
-            {/* Hover detail for merged exits */}
-            {label.detail && (
+            {/* Hover detail for merged exits — each trade colored */}
+            {hasDetail && (
               <div
                 className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/label:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap"
                 style={{
                   [label.above ? "bottom" : "top"]: "100%",
-                  marginBottom: label.above ? "4px" : undefined,
-                  marginTop: label.above ? undefined : "4px",
+                  marginBottom: label.above ? "6px" : undefined,
+                  marginTop: label.above ? undefined : "6px",
                 }}
               >
-                <div className="px-2 py-1 rounded text-[7px] font-mono"
-                  style={{ background: "rgba(12, 15, 21, 0.9)", border: "1px solid rgba(255,255,255,0.08)", color: "#8b949e", backdropFilter: "blur(8px)" }}>
-                  {label.detail}
+                <div className="px-2.5 py-1.5 rounded-md flex items-center gap-1 text-[10px] font-mono font-semibold"
+                  style={{ background: "rgba(12, 15, 21, 0.92)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(12px)" }}>
+                  {label.trades.map((t, i) => (
+                    <span key={i} className="flex items-center gap-1">
+                      {i > 0 && <span className="text-[var(--text-dim)] text-[8px]">+</span>}
+                      <span style={{ color: t.pnl >= 0 ? "#3fb950" : "#f85149" }}>{t.text}</span>
+                    </span>
+                  ))}
+                  <span className="text-[var(--text-dim)] text-[8px] mx-0.5">=</span>
+                  <span className="text-[11px]" style={{ color: label.color, textShadow: `0 0 6px ${label.color}40` }}>{label.text}</span>
                 </div>
               </div>
             )}
