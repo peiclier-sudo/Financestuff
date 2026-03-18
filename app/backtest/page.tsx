@@ -22,6 +22,7 @@ import ReplayChart from "./components/ReplayChart";
 import DayCharacteristics from "./components/DayCharacteristics";
 import HourlyStats from "./components/HourlyStats";
 import OrderPanel from "./components/OrderPanel";
+import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayPoolFilter from "./components/DayPoolFilter";
 
 let idCounter = 0;
@@ -49,6 +50,9 @@ export default function BacktestPage() {
 
   // Trading size (points per unit)
   const [tradingSize, setTradingSize] = useState(1);
+
+  // Performance overlay
+  const [showPerformance, setShowPerformance] = useState(false);
 
   // Pool filter
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
@@ -276,6 +280,13 @@ export default function BacktestPage() {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA") return;
 
+      if (e.key === "Escape") {
+        setShowPerformance(false);
+        return;
+      }
+
+      if (showPerformance) return; // Don't process other keys when overlay is open
+
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         advanceBar();
@@ -293,7 +304,7 @@ export default function BacktestPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [advanceBar, currentDay, revealedBarCount, dayComplete]);
+  }, [advanceBar, currentDay, revealedBarCount, dayComplete, showPerformance]);
 
   // Order handlers
   const handlePlaceOrder = useCallback((price: number, direction: "long" | "short", type: "limit" | "stop" | "market") => {
@@ -400,6 +411,23 @@ export default function BacktestPage() {
   const currentBar = currentDay && revealedBarCount > 0 ? currentDay.bars[revealedBarCount - 1] : null;
   const progress = currentDay ? Math.round((revealedBarCount / currentDay.bars.length) * 100) : 0;
 
+  // Data-reactive market state — shifts UI accent colors
+  useEffect(() => {
+    if (!currentDay || !currentBar) {
+      delete document.body.dataset.market;
+      return;
+    }
+    const dayOpen = currentDay.bars[0].open;
+    if (currentBar.close > dayOpen * 1.001) {
+      document.body.dataset.market = "bull";
+    } else if (currentBar.close < dayOpen * 0.999) {
+      document.body.dataset.market = "bear";
+    } else {
+      delete document.body.dataset.market;
+    }
+    return () => { delete document.body.dataset.market; };
+  }, [currentBar, currentDay]);
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
@@ -425,7 +453,7 @@ export default function BacktestPage() {
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Top Bar */}
-      <div className="flex-shrink-0 px-3 py-2 flex items-center gap-3 border-b border-[var(--border)]" style={{ background: "var(--surface)" }}>
+      <div className="flex-shrink-0 px-3 py-2 flex items-center gap-3" style={{ background: "rgba(12, 15, 21, 0.6)", backdropFilter: "blur(16px) saturate(1.3)", borderBottom: "1px solid rgba(255, 255, 255, 0.04)" }}>
         <Link href="/" className="text-[10px] text-[var(--text-dim)] hover:text-[var(--accent)] transition-colors">
           &larr; Home
         </Link>
@@ -567,36 +595,36 @@ export default function BacktestPage() {
         </div>
 
         {/* Right Panel (~30%) */}
-        <div className="w-80 flex-shrink-0 border-l border-[var(--border)] overflow-y-auto" style={{ background: "var(--surface)" }}>
-          <div className="p-3 space-y-4">
+        <div className="w-80 flex-shrink-0 border-l overflow-y-auto" style={{ background: "rgba(12, 15, 21, 0.5)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+          <div className="p-2 space-y-2 panel-focus-group">
             {/* Pool Filter (collapsible) */}
             {showFilter && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9881;" title="Pool Filter" rgb="96, 165, 250">
                 <DayPoolFilter
                   filter={poolFilter}
                   onChange={setPoolFilter}
                   poolSize={dayPool.length}
                   totalSize={allDays.length}
                 />
-              </div>
+              </SidePanel>
             )}
 
             {/* Day Characteristics & Stats */}
             {currentDay && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9733;" title="Day Analysis" rgb="255, 171, 64">
                 <DayCharacteristics day={currentDay} stats={signatureStats} />
-              </div>
+              </SidePanel>
             )}
 
             {/* Hourly Stats */}
             {currentDay && signatureStats.sampleSize > 0 && (
-              <div className="glass-panel-sm p-3">
+              <SidePanel icon="&#9201;" title="Hourly Stats" rgb="0, 230, 118">
                 <HourlyStats buckets={signatureStats.hourlyBuckets} />
-              </div>
+              </SidePanel>
             )}
 
             {/* Orders & Trades */}
-            <div className="glass-panel-sm p-3">
+            <SidePanel icon="&#9670;" title="Trading" rgb="192, 132, 252">
               <OrderPanel
                 orders={orders}
                 positions={positions}
@@ -609,10 +637,55 @@ export default function BacktestPage() {
                 onUpdatePositionTP={handleUpdatePositionTP}
                 onUpdateAllSL={handleUpdateAllSL}
                 onUpdateAllTP={handleUpdateAllTP}
+                onExpandResults={() => setShowPerformance(true)}
               />
-            </div>
+            </SidePanel>
           </div>
         </div>
+      </div>
+
+      {/* Performance Overlay */}
+      {showPerformance && (
+        <PerformanceOverlay
+          trades={sessionTrades}
+          onClose={() => setShowPerformance(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
+// SidePanel — glassmorphism container matching dashboard panels
+// ══════════════════════════════════════════════════════════
+
+function SidePanel({ icon, title, rgb, children }: { icon: string; title: string; rgb: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col rounded-lg overflow-hidden panel-focus" style={{
+      background: `linear-gradient(160deg, rgba(12, 15, 21, 0.72), rgba(18, 22, 30, 0.55))`,
+      backdropFilter: "blur(20px) saturate(1.3)",
+      WebkitBackdropFilter: "blur(20px) saturate(1.3)",
+      border: "1px solid rgba(255, 255, 255, 0.06)",
+      borderTopColor: `rgba(${rgb}, 0.2)`,
+      boxShadow: `0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04), 0 0 20px rgba(${rgb}, 0.02)`,
+    }}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-1.5 select-none flex-shrink-0" style={{
+        background: `linear-gradient(180deg, rgba(${rgb}, 0.04) 0%, transparent 100%)`,
+        borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+      }}>
+        <div className="flex gap-1">
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 82, 82, 0.3)" }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(255, 171, 64, 0.3)" }} />
+          <div className="w-[6px] h-[6px] rounded-full" style={{ background: "rgba(0, 230, 118, 0.3)" }} />
+        </div>
+        <div className="w-px h-2.5" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
+        <span className="text-[8px] opacity-35" dangerouslySetInnerHTML={{ __html: icon }} />
+        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.65)` }}>{title}</span>
+      </div>
+      {/* Content */}
+      <div className="p-3">
+        {children}
       </div>
     </div>
   );

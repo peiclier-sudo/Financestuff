@@ -456,11 +456,13 @@ const PANEL_ACCENT: Record<string, string> = {
 function Panel({ id, children, tabs, isResizing, widthPercent }: { id: string; children: React.ReactNode; tabs?: React.ReactNode; isResizing?: boolean; widthPercent?: number }) {
   const rgb = PANEL_ACCENT[id] || "96, 165, 250";
   return (
-    <div className="h-full flex flex-col rounded-xl overflow-hidden" style={{
-      background: `linear-gradient(160deg, #0c0f15, #12161e)`,
-      border: isResizing ? `1px solid rgba(${rgb}, 0.3)` : "1px solid var(--border)",
+    <div className="h-full flex flex-col rounded-xl overflow-hidden panel-focus" style={{
+      background: `linear-gradient(160deg, rgba(12, 15, 21, 0.75), rgba(18, 22, 30, 0.6))`,
+      backdropFilter: "blur(20px) saturate(1.4)",
+      WebkitBackdropFilter: "blur(20px) saturate(1.4)",
+      border: isResizing ? `1px solid rgba(${rgb}, 0.3)` : "1px solid rgba(255, 255, 255, 0.06)",
       borderTopColor: `rgba(${rgb}, 0.2)`,
-      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.03) inset, 0 0 40px rgba(${rgb}, 0.02)`,
+      boxShadow: `0 4px 24px rgba(0,0,0,0.4), 0 1px 0 rgba(255,255,255,0.05) inset, 0 0 40px rgba(${rgb}, 0.03)`,
       contain: "layout style",
     }}>
       {/* Title bar — drag handle */}

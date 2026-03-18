@@ -15,6 +15,7 @@ interface Props {
   onUpdatePositionTP: (id: string, tp: number | null) => void;
   onUpdateAllSL: (sl: number | null) => void;
   onUpdateAllTP: (tp: number | null) => void;
+  onExpandResults: () => void;
 }
 
 export default function OrderPanel({
@@ -29,6 +30,7 @@ export default function OrderPanel({
   onUpdatePositionTP,
   onUpdateAllSL,
   onUpdateAllTP,
+  onExpandResults,
 }: Props) {
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const currentPrice = currentBar?.close ?? 0;
@@ -67,24 +69,37 @@ export default function OrderPanel({
 
   return (
     <div className="space-y-3 text-[11px]">
-      {/* Session Summary */}
-      <div className="flex gap-3">
-        <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
-          <div className="text-[9px] text-[var(--text-dim)]">Trades</div>
-          <div className="font-semibold text-[var(--text)]">{sessionTrades.length}</div>
-        </div>
-        <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
-          <div className="text-[9px] text-[var(--text-dim)]">Win Rate</div>
-          <div className="font-semibold" style={{ color: winRate >= 50 ? "var(--green)" : "var(--red)" }}>
-            {sessionTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
+      {/* Session Summary — clickable to expand */}
+      <div className="relative">
+        <div className="flex gap-3 cursor-pointer group" onClick={onExpandResults}>
+          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
+            <div className="text-[9px] text-[var(--text-dim)]">Trades</div>
+            <div className="font-semibold text-[var(--text)]">{sessionTrades.length}</div>
+          </div>
+          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
+            <div className="text-[9px] text-[var(--text-dim)]">Win Rate</div>
+            <div className="font-semibold" style={{ color: winRate >= 50 ? "var(--green)" : "var(--red)" }}>
+              {sessionTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
+            </div>
+          </div>
+          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
+            <div className="text-[9px] text-[var(--text-dim)]">P&L</div>
+            <div className="font-mono font-semibold" style={{ color: totalPnl >= 0 ? "var(--green)" : "var(--red)" }}>
+              {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}
+            </div>
           </div>
         </div>
-        <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
-          <div className="text-[9px] text-[var(--text-dim)]">P&L</div>
-          <div className="font-mono font-semibold" style={{ color: totalPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-            {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}
-          </div>
-        </div>
+        {/* Expand hint */}
+        <button
+          onClick={onExpandResults}
+          className="absolute -top-1 -right-1 w-5 h-5 rounded flex items-center justify-center text-[9px] transition-all hover:scale-110"
+          style={{ background: "rgba(192, 132, 252, 0.15)", color: "rgba(192, 132, 252, 0.8)", border: "1px solid rgba(192, 132, 252, 0.2)" }}
+          title="Expand performance dashboard"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M1 9L9 1M9 1H4M9 1V6" />
+          </svg>
+        </button>
       </div>
 
       {/* Avg Win / Avg Loss */}
