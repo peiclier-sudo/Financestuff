@@ -82,19 +82,43 @@ export default function OrderPanel({
                   <div className="ml-auto flex gap-1">
                     <button
                       onClick={() => {
-                        const val = prompt("Stop Loss price:", p.stopLoss?.toFixed(1) ?? "");
-                        if (val !== null) onUpdatePositionSL(p.id, val ? parseFloat(val) : null);
+                        if (p.stopLoss != null) {
+                          // Toggle off
+                          onUpdatePositionSL(p.id, null);
+                        } else {
+                          // Set 20 pts away from entry (user can drag to adjust)
+                          const sl = p.direction === "long"
+                            ? p.entryPrice - 20
+                            : p.entryPrice + 20;
+                          onUpdatePositionSL(p.id, Math.round(sl * 10) / 10);
+                        }
                       }}
-                      className="text-[8px] px-1.5 py-0.5 rounded text-[var(--red)] hover:bg-[var(--red-dim)]"
-                      title="Edit SL"
+                      className="text-[8px] px-1.5 py-0.5 rounded transition-colors"
+                      style={{
+                        color: p.stopLoss != null ? "#0d1117" : "var(--red)",
+                        background: p.stopLoss != null ? "var(--red)" : "transparent",
+                      }}
+                      title={p.stopLoss != null ? `SL @ ${p.stopLoss.toFixed(1)} (click to remove)` : "Add SL (20pts, drag to adjust)"}
                     >SL</button>
                     <button
                       onClick={() => {
-                        const val = prompt("Take Profit price:", p.takeProfit?.toFixed(1) ?? "");
-                        if (val !== null) onUpdatePositionTP(p.id, val ? parseFloat(val) : null);
+                        if (p.takeProfit != null) {
+                          // Toggle off
+                          onUpdatePositionTP(p.id, null);
+                        } else {
+                          // Set 20 pts away from entry (user can drag to adjust)
+                          const tp = p.direction === "long"
+                            ? p.entryPrice + 20
+                            : p.entryPrice - 20;
+                          onUpdatePositionTP(p.id, Math.round(tp * 10) / 10);
+                        }
                       }}
-                      className="text-[8px] px-1.5 py-0.5 rounded text-[var(--green)] hover:bg-[var(--green-dim)]"
-                      title="Edit TP"
+                      className="text-[8px] px-1.5 py-0.5 rounded transition-colors"
+                      style={{
+                        color: p.takeProfit != null ? "#0d1117" : "var(--green)",
+                        background: p.takeProfit != null ? "var(--green)" : "transparent",
+                      }}
+                      title={p.takeProfit != null ? `TP @ ${p.takeProfit.toFixed(1)} (click to remove)` : "Add TP (20pts, drag to adjust)"}
                     >TP</button>
                     <button
                       onClick={() => onClosePosition(p.id)}
