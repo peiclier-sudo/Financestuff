@@ -111,7 +111,7 @@ export default function ReplayChart({
   // Pattern detection
   const patternMarkers = useMemo(() => {
     if (activePatterns.size === 0 || revealedBars.length < 2) return [];
-    const markers: { time: number; position: "aboveBar" | "belowBar"; shape: "circle" | "square" | "arrowUp" | "arrowDown"; color: string; text: string; size: number }[] = [];
+    const markers: { time: number; position: "aboveBar" | "belowBar"; shape: "arrowUp" | "arrowDown"; color: string; text: string; size: number }[] = [];
 
     for (let i = 1; i < revealedBars.length; i++) {
       const curr = revealedBars[i];
@@ -120,14 +120,14 @@ export default function ReplayChart({
       // Inside Bar: current bar's high/low is within previous bar's range
       if (activePatterns.has("insideBar")) {
         if (curr.high <= prev.high && curr.low >= prev.low) {
-          markers.push({ time: curr.time, position: "aboveBar", shape: "circle", color: "#58a6ff", text: "IB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#58a6ff", text: "IB", size: 0.5 });
         }
       }
 
       // Outside Bar: current bar engulfs previous bar
       if (activePatterns.has("outsideBar")) {
         if (curr.high > prev.high && curr.low < prev.low) {
-          markers.push({ time: curr.time, position: "aboveBar", shape: "square", color: "#d2a8ff", text: "OB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#d2a8ff", text: "OB", size: 0.5 });
         }
       }
     }
@@ -139,10 +139,10 @@ export default function ReplayChart({
       let breakoutFound = false;
       for (let i = 3; i < revealedBars.length && !breakoutFound; i++) {
         if (revealedBars[i].close > orbHigh) {
-          markers.push({ time: revealedBars[i].time, position: "belowBar", shape: "arrowUp", color: "#3fb950", text: "ORB↑", size: 0.5 });
+          markers.push({ time: revealedBars[i].time, position: "belowBar", shape: "arrowUp", color: "#3fb950", text: "ORB", size: 0.5 });
           breakoutFound = true;
         } else if (revealedBars[i].close < orbLow) {
-          markers.push({ time: revealedBars[i].time, position: "aboveBar", shape: "arrowDown", color: "#f85149", text: "ORB↓", size: 0.5 });
+          markers.push({ time: revealedBars[i].time, position: "aboveBar", shape: "arrowDown", color: "#f85149", text: "ORB", size: 0.5 });
           breakoutFound = true;
         }
       }
