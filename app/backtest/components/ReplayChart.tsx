@@ -80,6 +80,8 @@ export default function ReplayChart({
   const [dragging, setDragging] = useState<DragLine | null>(null);
   const [tradeLabels, setTradeLabels] = useState<TradeLabel[]>([]);
   const [labelPositions, setLabelPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [posLabels, setPosLabels] = useState<{ id: string; price: number; text: string; direction: string; pnl: number }[]>([]);
+  const [posLabelPositions, setPosLabelPositions] = useState<Map<string, number>>(new Map()); // id -> y coordinate
   const lastCrosshairPrice = useRef<number>(0);
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
@@ -274,33 +276,41 @@ export default function ReplayChart({
     const hasUnifiedSL = slValues.size === 1 && positions.length > 1 && positions.every((p) => p.stopLoss != null);
     const hasUnifiedTP = tpValues.size === 1 && positions.length > 1 && positions.every((p) => p.takeProfit != null);
 
+    // Position entry lines — clean, no title (PnL shown via HTML overlay)
+    const newPosLabels: typeof posLabels = [];
     positions.forEach((p) => {
-      // Entry — show direction + unrealized P&L (colored by profit/loss)
       const mult = p.direction === "long" ? 1 : -1;
       const pnl = (currentPrice - p.entryPrice) * mult;
-      const pnlColor = pnl >= 0 ? "#3fb950" : "#f85149";
-      const pnlStr = `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(1)}`;
+      const pnlColor = pnl >= 0 ? "#3fb95090" : "#f8514990";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
-        lineWidth: 1,
-        lineStyle: 0,
+        lineWidth: 2,
+        lineStyle: 2, // dashed — smoother than solid for entries
         axisLabelVisible: true,
-        title: `${p.direction === "long" ? "L" : "S"} ${pnlStr}`,
-        axisLabelColor: pnlColor,
+        title: "",
+        axisLabelColor: pnl >= 0 ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
 
-      // Only show individual SL/TP if not unified
+      newPosLabels.push({
+        id: p.id,
+        price: p.entryPrice,
+        text: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(1)}`,
+        direction: p.direction,
+        pnl,
+      });
+
+      // SL/TP: smooth dashed lines (lineStyle 2), slightly transparent
       if (p.stopLoss != null && !hasUnifiedSL) {
         const slPl = series.createPriceLine({
           price: p.stopLoss,
-          color: "#f85149",
+          color: "#f8514960",
           lineWidth: 1,
-          lineStyle: 3,
+          lineStyle: 2,
           axisLabelVisible: true,
-          title: "SL",
+          title: "",
           axisLabelColor: "#f85149",
           axisLabelTextColor: "#0d1117",
         });
@@ -310,27 +320,28 @@ export default function ReplayChart({
       if (p.takeProfit != null && !hasUnifiedTP) {
         const tpPl = series.createPriceLine({
           price: p.takeProfit,
-          color: "#3fb950",
+          color: "#3fb95060",
           lineWidth: 1,
-          lineStyle: 3,
+          lineStyle: 2,
           axisLabelVisible: true,
-          title: "TP",
+          title: "",
           axisLabelColor: "#3fb950",
           axisLabelTextColor: "#0d1117",
         });
         priceLinesRef.current.set(`pos-tp-${p.id}`, tpPl);
       }
     });
+    setPosLabels(newPosLabels);
 
-    // Unified SL/TP lines (single line for all positions)
+    // Unified SL/TP lines — smooth dashed, slightly bolder
     if (hasUnifiedSL && unifiedSL != null) {
       const slPl = series.createPriceLine({
         price: unifiedSL,
-        color: "#f85149",
+        color: "#f8514980",
         lineWidth: 2,
-        lineStyle: 0,
+        lineStyle: 2,
         axisLabelVisible: true,
-        title: `SL (${positions.length})`,
+        title: "",
         axisLabelColor: "#f85149",
         axisLabelTextColor: "#0d1117",
       });
@@ -339,16 +350,24 @@ export default function ReplayChart({
     if (hasUnifiedTP && unifiedTP != null) {
       const tpPl = series.createPriceLine({
         price: unifiedTP,
-        color: "#3fb950",
+        color: "#3fb95080",
         lineWidth: 2,
-        lineStyle: 0,
+        lineStyle: 2,
         axisLabelVisible: true,
-        title: `TP (${positions.length})`,
+        title: "",
         axisLabelColor: "#3fb950",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set("unified-tp", tpPl);
     }
+
+    // Compute position label Y coordinates
+    const newPosLabelPos = new Map<string, number>();
+    for (const pl of newPosLabels) {
+      const y = series.priceToCoordinate(pl.price);
+      if (y !== null) newPosLabelPos.set(pl.id, y as number);
+    }
+    setPosLabelPositions(newPosLabelPos);
 
     // Compute trade labels — only PnL, merge exits on the same bar
     const labels: TradeLabel[] = [];
@@ -461,9 +480,11 @@ export default function ReplayChart({
   useEffect(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
-    if (!chart || !series || tradeLabels.length === 0) return;
+    if (!chart || !series) return;
+    if (tradeLabels.length === 0 && posLabels.length === 0) return;
 
     const updatePositions = () => {
+      // Trade exit labels
       const newPos = new Map<string, { x: number; y: number }>();
       for (const label of tradeLabels) {
         const x = chart.timeScale().timeToCoordinate(label.time as UTCTimestamp);
@@ -473,6 +494,14 @@ export default function ReplayChart({
         }
       }
       setLabelPositions(newPos);
+
+      // Position PnL labels (only need Y coordinate)
+      const newPosPos = new Map<string, number>();
+      for (const pl of posLabels) {
+        const y = series.priceToCoordinate(pl.price);
+        if (y !== null) newPosPos.set(pl.id, y as number);
+      }
+      setPosLabelPositions(newPosPos);
     };
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(updatePositions);
@@ -480,7 +509,7 @@ export default function ReplayChart({
     return () => {
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updatePositions); } catch {}
     };
-  }, [tradeLabels]);
+  }, [tradeLabels, posLabels]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -706,6 +735,40 @@ export default function ReplayChart({
         onMouseLeave={handleMouseUp}
         style={{ cursor: dragging ? "ns-resize" : "crosshair" }}
       />
+
+      {/* Position PnL labels — large, aesthetic blocks pinned to left edge */}
+      {posLabels.map((pl) => {
+        const y = posLabelPositions.get(pl.id);
+        if (y == null) return null;
+        const isProfit = pl.pnl >= 0;
+        const color = isProfit ? "#3fb950" : "#f85149";
+        const bgColor = isProfit ? "rgba(63, 185, 80, 0.08)" : "rgba(248, 81, 73, 0.08)";
+        const borderColor = isProfit ? "rgba(63, 185, 80, 0.2)" : "rgba(248, 81, 73, 0.2)";
+        return (
+          <div
+            key={`pos-label-${pl.id}`}
+            className="absolute z-30 pointer-events-none"
+            style={{ left: 12, top: y, transform: "translateY(-50%)" }}
+          >
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md"
+              style={{
+                background: bgColor,
+                border: `1px solid ${borderColor}`,
+                backdropFilter: "blur(8px)",
+                boxShadow: `0 0 12px ${isProfit ? "rgba(63, 185, 80, 0.06)" : "rgba(248, 81, 73, 0.06)"}`,
+              }}
+            >
+              <span className="text-[9px] font-semibold uppercase opacity-50" style={{ color }}>
+                {pl.direction === "long" ? "L" : "S"}
+              </span>
+              <span className="text-[13px] font-mono font-bold tracking-tight" style={{ color, textShadow: `0 0 8px ${color}40` }}>
+                {pl.text}
+              </span>
+            </div>
+          </div>
+        );
+      })}
 
       {/* Trade labels — discreet positioned HTML bubbles */}
       {tradeLabels.map((label) => {
