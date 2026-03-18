@@ -432,21 +432,12 @@ export default function BacktestPage() {
         {currentDay && (
           <>
             <div className="w-px h-4 bg-[var(--border)]" />
-            <div className="flex items-center gap-2">
-              <button
-                onClick={advanceBar}
-                disabled={dayComplete}
-                className="btn-primary text-[10px] py-1 px-3 disabled:opacity-30"
-              >
-                Next Bar &rarr;
-              </button>
-              <span className="text-[10px] font-mono text-[var(--text-dim)]">
-                {revealedBarCount}/{currentDay.bars.length} ({progress}%)
-              </span>
-              {dayComplete && (
-                <span className="text-[10px] font-semibold text-[var(--orange)]">Day Complete</span>
-              )}
-            </div>
+            <span className="text-[10px] font-mono text-[var(--text-dim)]">
+              {revealedBarCount}/{currentDay.bars.length} ({progress}%)
+            </span>
+            {dayComplete && (
+              <span className="text-[10px] font-semibold text-[var(--orange)]">Day Complete</span>
+            )}
           </>
         )}
 
@@ -502,6 +493,39 @@ export default function BacktestPage() {
             </div>
           )}
 
+          {/* Action buttons — bottom-right of chart */}
+          {currentDay && !dayComplete && (
+            <div className="absolute bottom-3 right-3 z-40 flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  const price = currentDay.bars[revealedBarCount - 1]?.close;
+                  if (price) handlePlaceOrder(price, "long", "market");
+                }}
+                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
+                style={{ background: "#3fb95020", color: "#3fb950", border: "1px solid #3fb95040" }}
+              >
+                BUY
+              </button>
+              <button
+                onClick={advanceBar}
+                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
+                style={{ background: "#58a6ff15", color: "#58a6ff", border: "1px solid #58a6ff40" }}
+              >
+                Next Bar &rarr;
+              </button>
+              <button
+                onClick={() => {
+                  const price = currentDay.bars[revealedBarCount - 1]?.close;
+                  if (price) handlePlaceOrder(price, "short", "market");
+                }}
+                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
+                style={{ background: "#f8514920", color: "#f85149", border: "1px solid #f8514940" }}
+              >
+                SHORT
+              </button>
+            </div>
+          )}
+
           {/* Day complete overlay showing the date */}
           {dayComplete && currentDay && (
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 glass-panel-sm px-4 py-2 text-center slide-in">
@@ -549,6 +573,7 @@ export default function BacktestPage() {
                 orders={orders}
                 positions={positions}
                 closedTrades={closedTrades}
+                sessionTrades={sessionTrades}
                 currentBar={currentBar}
                 onCancelOrder={handleCancelOrder}
                 onClosePosition={handleClosePosition}
