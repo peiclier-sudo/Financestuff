@@ -498,7 +498,7 @@ export default function BacktestPage() {
                 {sessionTrades.length > 0 && ` | ${((sessionWins / sessionTrades.length) * 100).toFixed(0)}% win`}
               </span>
               <span className="font-mono font-semibold" style={{ color: sessionPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                {sessionPnl >= 0 ? "+" : ""}{sessionPnl.toFixed(1)} pts
+                {sessionPnl >= 0 ? "+" : ""}${sessionPnl.toFixed(1)}
               </span>
             </>
           )}
@@ -548,7 +548,7 @@ export default function BacktestPage() {
 
           {/* Action buttons — bottom-right, offset from axis */}
           {currentDay && !dayComplete && (
-            <div className="absolute bottom-3 z-40 flex items-center gap-2" style={{ right: "96px" }}>
+            <div className="absolute bottom-10 z-40 flex items-center gap-2" style={{ right: "96px" }}>
               <button
                 onClick={() => {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
@@ -599,7 +599,7 @@ export default function BacktestPage() {
 
           {/* Day complete overlay showing the date */}
           {dayComplete && currentDay && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 glass-panel-sm px-4 py-2 text-center slide-in">
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 glass-panel-sm px-4 py-2 text-center slide-in">
               <p className="text-[11px] text-[var(--text-muted)]">Day revealed:</p>
               <p className="text-sm font-bold text-[var(--text)]">{currentDay.date} ({currentDay.dayName})</p>
               <p className="text-[11px] font-mono mt-1" style={{ color: currentDay.changePercent >= 0 ? "var(--green)" : "var(--red)" }}>

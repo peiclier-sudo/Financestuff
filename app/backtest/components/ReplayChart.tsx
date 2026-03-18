@@ -27,9 +27,10 @@ interface TradeLabel {
   time: number;
   price: number;
   text: string;
+  detail: string; // hover tooltip: breakdown of individual trades
   color: string;
   bgColor: string;
-  above: boolean; // above or below the bar
+  above: boolean;
 }
 
 interface Props {
@@ -274,18 +275,19 @@ export default function ReplayChart({
     const hasUnifiedTP = tpValues.size === 1 && positions.length > 1 && positions.every((p) => p.takeProfit != null);
 
     positions.forEach((p) => {
-      // Entry — show direction + unrealized P&L
+      // Entry — show direction + unrealized P&L (colored by profit/loss)
       const mult = p.direction === "long" ? 1 : -1;
       const pnl = (currentPrice - p.entryPrice) * mult;
-      const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}`;
+      const pnlColor = pnl >= 0 ? "#3fb950" : "#f85149";
+      const pnlStr = `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(1)}`;
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
-        color: p.direction === "long" ? "#3fb950" : "#f85149",
+        color: pnlColor,
         lineWidth: 1,
         lineStyle: 0,
         axisLabelVisible: true,
         title: `${p.direction === "long" ? "L" : "S"} ${pnlStr}`,
-        axisLabelColor: p.direction === "long" ? "#3fb950" : "#f85149",
+        axisLabelColor: pnlColor,
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
@@ -348,40 +350,42 @@ export default function ReplayChart({
       priceLinesRef.current.set("unified-tp", tpPl);
     }
 
-    // Compute trade labels for HTML overlay (replaces built-in markers)
+    // Compute trade labels — only PnL, merge exits on the same bar
     const labels: TradeLabel[] = [];
     if (closedTrades.length > 0 && revealedBars.length > 0) {
       const dayStart = bars[0].time;
       const dayEnd = bars[bars.length - 1].time;
+
+      // Group exits by bar index to merge same-bar exits
+      const exitGroups = new Map<number, { trades: ClosedTrade[]; bar: Bar }>();
       for (const t of closedTrades) {
         if (t.entryTime < dayStart || t.entryTime > dayEnd) continue;
-        const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
         const exitIdx = findClosestBarIndex(revealedBars, t.exitTime);
-        if (entryIdx >= 0 && exitIdx >= 0 && exitIdx < revealedBars.length) {
-          const entryBar = revealedBars[entryIdx];
-          const exitBar = revealedBars[exitIdx];
-          // Entry label
-          labels.push({
-            id: `entry-${t.id}`,
-            time: entryBar.time,
-            price: t.direction === "long" ? entryBar.low : entryBar.high,
-            text: `${t.entryPrice.toFixed(0)}`,
-            color: "#8b949e",
-            bgColor: "rgba(22, 27, 34, 0.85)",
-            above: t.direction === "short",
-          });
-          // Exit label
-          const exitColor = t.pnlPoints >= 0 ? "#3fb950" : "#f85149";
-          labels.push({
-            id: `exit-${t.id}`,
-            time: exitBar.time,
-            price: t.direction === "long" ? exitBar.high : exitBar.low,
-            text: `${t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}`,
-            color: exitColor,
-            bgColor: t.pnlPoints >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
-            above: t.direction === "long",
-          });
+        if (exitIdx >= 0 && exitIdx < revealedBars.length) {
+          const group = exitGroups.get(exitIdx) || { trades: [], bar: revealedBars[exitIdx] };
+          group.trades.push(t);
+          exitGroups.set(exitIdx, group);
         }
+      }
+
+      // Create one label per exit group (merged)
+      for (const [, group] of exitGroups) {
+        const totalPnl = group.trades.reduce((s, t) => s + t.pnlPoints, 0);
+        const color = totalPnl >= 0 ? "#3fb950" : "#f85149";
+        // Detail for hover: show each trade's PnL
+        const detail = group.trades.length > 1
+          ? group.trades.map((t) => `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`).join(" + ") + ` = ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`
+          : "";
+        labels.push({
+          id: `exit-${group.trades.map((t) => t.id).join("-")}`,
+          time: group.bar.time,
+          price: totalPnl >= 0 ? group.bar.high : group.bar.low,
+          text: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`,
+          detail,
+          color,
+          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
+          above: totalPnl >= 0,
+        });
       }
     }
     setTradeLabels(labels);
@@ -711,11 +715,12 @@ export default function ReplayChart({
         return (
           <div
             key={label.id}
-            className="absolute z-30 pointer-events-none"
+            className="absolute z-30 group/label"
             style={{
               left: pos.x,
               top: pos.y + offsetY,
               transform: "translateX(-50%)",
+              pointerEvents: label.detail ? "auto" : "none",
             }}
           >
             <div
@@ -729,6 +734,22 @@ export default function ReplayChart({
             >
               {label.text}
             </div>
+            {/* Hover detail for merged exits */}
+            {label.detail && (
+              <div
+                className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/label:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap"
+                style={{
+                  [label.above ? "bottom" : "top"]: "100%",
+                  marginBottom: label.above ? "4px" : undefined,
+                  marginTop: label.above ? undefined : "4px",
+                }}
+              >
+                <div className="px-2 py-1 rounded text-[7px] font-mono"
+                  style={{ background: "rgba(12, 15, 21, 0.9)", border: "1px solid rgba(255,255,255,0.08)", color: "#8b949e", backdropFilter: "blur(8px)" }}>
+                  {label.detail}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}
