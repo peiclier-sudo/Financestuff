@@ -22,6 +22,7 @@ import ReplayChart from "./components/ReplayChart";
 import DayCharacteristics from "./components/DayCharacteristics";
 import HourlyStats from "./components/HourlyStats";
 import OrderPanel from "./components/OrderPanel";
+import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayPoolFilter from "./components/DayPoolFilter";
 
 let idCounter = 0;
@@ -49,6 +50,9 @@ export default function BacktestPage() {
 
   // Trading size (points per unit)
   const [tradingSize, setTradingSize] = useState(1);
+
+  // Performance overlay
+  const [showPerformance, setShowPerformance] = useState(false);
 
   // Pool filter
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
@@ -276,6 +280,13 @@ export default function BacktestPage() {
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "SELECT" || target.tagName === "TEXTAREA") return;
 
+      if (e.key === "Escape") {
+        setShowPerformance(false);
+        return;
+      }
+
+      if (showPerformance) return; // Don't process other keys when overlay is open
+
       if (e.key === "ArrowRight" || e.key === " ") {
         e.preventDefault();
         advanceBar();
@@ -293,7 +304,7 @@ export default function BacktestPage() {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [advanceBar, currentDay, revealedBarCount, dayComplete]);
+  }, [advanceBar, currentDay, revealedBarCount, dayComplete, showPerformance]);
 
   // Order handlers
   const handlePlaceOrder = useCallback((price: number, direction: "long" | "short", type: "limit" | "stop" | "market") => {
@@ -609,11 +620,20 @@ export default function BacktestPage() {
                 onUpdatePositionTP={handleUpdatePositionTP}
                 onUpdateAllSL={handleUpdateAllSL}
                 onUpdateAllTP={handleUpdateAllTP}
+                onExpandResults={() => setShowPerformance(true)}
               />
             </SidePanel>
           </div>
         </div>
       </div>
+
+      {/* Performance Overlay */}
+      {showPerformance && (
+        <PerformanceOverlay
+          trades={sessionTrades}
+          onClose={() => setShowPerformance(false)}
+        />
+      )}
     </div>
   );
 }
