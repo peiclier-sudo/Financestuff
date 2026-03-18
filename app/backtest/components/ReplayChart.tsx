@@ -61,7 +61,7 @@ export default function ReplayChart({
   const [dragging, setDragging] = useState<DragLine | null>(null);
   const lastCrosshairPrice = useRef<number>(0);
   const timeRangeSetRef = useRef(false);
-  const prevBarsRef = useRef<Bar[]>([]);
+  const prevFirstBarTime = useRef<number>(0);
 
   const revealedBars = bars.slice(0, revealedCount);
   const currentPrice = revealedBars.length > 0 ? revealedBars[revealedBars.length - 1].close : 0;
@@ -242,12 +242,12 @@ export default function ReplayChart({
       // Entry
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
-        color: "#58a6ff",
-        lineWidth: 2,
+        color: p.direction === "long" ? "#3fb950" : "#f85149",
+        lineWidth: 1,
         lineStyle: 0,
         axisLabelVisible: true,
-        title: `${p.direction === "long" ? "LONG" : "SHORT"} Entry`,
-        axisLabelColor: "#58a6ff",
+        title: p.direction === "long" ? "L" : "S",
+        axisLabelColor: p.direction === "long" ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
@@ -281,10 +281,14 @@ export default function ReplayChart({
       }
     });
 
-    // Closed trade markers
+    // Closed trade markers — only show trades whose times fall within current day's bar range
+    const markers: SeriesMarker<UTCTimestamp>[] = [];
     if (closedTrades.length > 0 && revealedBars.length > 0) {
-      const markers: SeriesMarker<UTCTimestamp>[] = [];
+      const dayStart = bars[0].time;
+      const dayEnd = bars[bars.length - 1].time;
       for (const t of closedTrades) {
+        // Skip trades from other days
+        if (t.entryTime < dayStart || t.entryTime > dayEnd) continue;
         const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
         const exitIdx = findClosestBarIndex(revealedBars, t.exitTime);
         if (entryIdx >= 0 && exitIdx >= 0 && exitIdx < revealedBars.length) {
@@ -293,7 +297,7 @@ export default function ReplayChart({
             position: t.direction === "long" ? "belowBar" : "aboveBar",
             color: "#58a6ff",
             shape: t.direction === "long" ? "arrowUp" : "arrowDown",
-            text: `${t.direction === "long" ? "BUY" : "SELL"} ${t.entryPrice.toFixed(0)}`,
+            text: `${t.direction === "long" ? "B" : "S"} ${t.entryPrice.toFixed(0)}`,
           });
           const exitColor = t.pnlPoints >= 0 ? "#3fb950" : "#f85149";
           markers.push({
@@ -301,23 +305,23 @@ export default function ReplayChart({
             position: t.direction === "long" ? "aboveBar" : "belowBar",
             color: exitColor,
             shape: "circle",
-            text: `${t.exitReason.toUpperCase()} ${t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(0)}`,
+            text: `${t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}`,
           });
         }
       }
       markers.sort((a, b) => (a.time as number) - (b.time as number));
-      createSeriesMarkers(series, markers);
     }
+    // Always call to clear stale markers when switching days
+    createSeriesMarkers(series, markers);
 
     // Set fixed time range for the entire day — only on new day load
-    // This prevents the chart from re-zooming on every bar advance
-    // Use logical range (bar indices) so the chart reserves space for all bars
-    const isDayChange = bars !== prevBarsRef.current;
+    const firstBarTime = bars.length > 0 ? bars[0].time : 0;
+    const isDayChange = firstBarTime !== prevFirstBarTime.current;
     if (isDayChange || !timeRangeSetRef.current) {
       if (bars.length >= 2) {
         chart.timeScale().setVisibleLogicalRange({ from: -1, to: bars.length });
         timeRangeSetRef.current = true;
-        prevBarsRef.current = bars;
+        prevFirstBarTime.current = firstBarTime;
       } else {
         chart.timeScale().fitContent();
       }

@@ -7,6 +7,7 @@ interface Props {
   orders: Order[];
   positions: Position[];
   closedTrades: ClosedTrade[];
+  sessionTrades: ClosedTrade[];
   currentBar: Bar | null;
   onCancelOrder: (id: string) => void;
   onClosePosition: (id: string) => void;
@@ -18,6 +19,7 @@ export default function OrderPanel({
   orders,
   positions,
   closedTrades,
+  sessionTrades,
   currentBar,
   onCancelOrder,
   onClosePosition,
@@ -27,10 +29,10 @@ export default function OrderPanel({
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const currentPrice = currentBar?.close ?? 0;
 
-  // Session summary
-  const totalPnl = closedTrades.reduce((sum, t) => sum + t.pnlPoints, 0);
-  const winners = closedTrades.filter((t) => t.pnlPoints > 0).length;
-  const winRate = closedTrades.length > 0 ? (winners / closedTrades.length) * 100 : 0;
+  // Session summary (all trades across all days)
+  const totalPnl = sessionTrades.reduce((sum, t) => sum + t.pnlPoints, 0);
+  const winners = sessionTrades.filter((t) => t.pnlPoints > 0).length;
+  const winRate = sessionTrades.length > 0 ? (winners / sessionTrades.length) * 100 : 0;
 
   // Unrealized P&L
   const unrealizedPnl = positions.reduce((sum, p) => {
@@ -44,7 +46,7 @@ export default function OrderPanel({
       <div className="flex gap-3">
         <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
           <div className="text-[9px] text-[var(--text-dim)]">Trades</div>
-          <div className="font-semibold text-[var(--text)]">{closedTrades.length}</div>
+          <div className="font-semibold text-[var(--text)]">{sessionTrades.length}</div>
         </div>
         <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
           <div className="text-[9px] text-[var(--text-dim)]">Win Rate</div>
@@ -136,11 +138,11 @@ export default function OrderPanel({
       )}
 
       {/* Trade Log */}
-      {closedTrades.length > 0 && (
+      {sessionTrades.length > 0 && (
         <div>
           <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1.5">Trade Log</h3>
           <div className="space-y-0.5 max-h-32 overflow-y-auto">
-            {[...closedTrades].reverse().map((t) => (
+            {[...sessionTrades].reverse().map((t) => (
               <div key={t.id} className="flex items-center gap-2 py-0.5 text-[10px]">
                 <span className="font-bold" style={{ color: t.direction === "long" ? "var(--green)" : "var(--red)" }}>
                   {t.direction === "long" ? "L" : "S"}
@@ -156,7 +158,7 @@ export default function OrderPanel({
         </div>
       )}
 
-      {closedTrades.length === 0 && positions.length === 0 && pendingOrders.length === 0 && (
+      {sessionTrades.length === 0 && positions.length === 0 && pendingOrders.length === 0 && (
         <div className="text-center text-[var(--text-dim)] text-[10px] py-4">
           <p>No trades yet</p>
           <p className="mt-1">Click on chart to place orders</p>
