@@ -683,12 +683,12 @@ export default function ReplayChart({
       <div className="absolute top-2 right-16 z-40 flex items-center gap-2">
         {prevDayATR != null && (
           <div className="text-[9px] font-mono px-2 py-1 rounded"
-            style={{ background: "#161b22", border: "1px solid #21262d", color: "#7d8590" }}>
+            style={{ background: "rgba(12, 15, 21, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.06)", color: "#7d8590" }}>
             ATR <span className="text-[var(--text)]">{prevDayATR.toFixed(1)}</span>
           </div>
         )}
         <div className="flex items-center gap-0.5 px-1 py-0.5 rounded"
-          style={{ background: "#161b22", border: "1px solid #21262d" }}>
+          style={{ background: "rgba(12, 15, 21, 0.7)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.06)" }}>
           <span className="text-[8px] text-[#7d8590] mr-1">Size</span>
           {SIZES.map((s) => (
             <button
@@ -696,7 +696,7 @@ export default function ReplayChart({
               onClick={() => onTradingSizeChange(s)}
               className="text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors"
               style={{
-                background: tradingSize === s ? "#58a6ff" : "transparent",
+                background: tradingSize === s ? "var(--accent)" : "transparent",
                 color: tradingSize === s ? "#0d1117" : "#7d8590",
               }}
             >{s}</button>

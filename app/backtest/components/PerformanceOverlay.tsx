@@ -12,20 +12,22 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
   const stats = useMemo(() => computeStats(trades), [trades]);
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(8px)" }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(16px) saturate(0.8)" }}>
       <div
-        className="w-[90vw] max-w-[1200px] h-[85vh] flex flex-col rounded-xl overflow-hidden"
+        className="w-[90vw] max-w-[1200px] h-[85vh] flex flex-col rounded-xl overflow-hidden float-in"
         style={{
-          background: "linear-gradient(160deg, #0c0f15, #12161e)",
-          border: "1px solid var(--border)",
+          background: "linear-gradient(160deg, rgba(12, 15, 21, 0.85), rgba(18, 22, 30, 0.75))",
+          backdropFilter: "blur(32px) saturate(1.4)",
+          WebkitBackdropFilter: "blur(32px) saturate(1.4)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
           borderTopColor: "rgba(192, 132, 252, 0.25)",
-          boxShadow: "0 8px 64px rgba(0,0,0,0.6), 0 0 60px rgba(192, 132, 252, 0.05), inset 0 1px 0 rgba(255,255,255,0.03)",
+          boxShadow: "0 8px 64px rgba(0,0,0,0.6), 0 0 80px rgba(192, 132, 252, 0.04), inset 0 1px 0 rgba(255,255,255,0.06), inset 0 -1px 0 rgba(0,0,0,0.15)",
         }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{
-          background: "linear-gradient(180deg, rgba(192, 132, 252, 0.05) 0%, transparent 100%)",
-          borderBottom: "1px solid var(--border)",
+          background: "linear-gradient(180deg, rgba(192, 132, 252, 0.04) 0%, transparent 100%)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
         }}>
           <div className="flex gap-1.5">
             <div className="w-[8px] h-[8px] rounded-full cursor-pointer hover:opacity-100" style={{ background: "rgba(255, 82, 82, 0.5)" }} onClick={onClose} />
