@@ -35,7 +35,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
             <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(0, 230, 118, 0.35)" }} />
           </div>
           <div className="w-px h-4 bg-[var(--border)]" />
-          <span className="text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(192, 132, 252, 0.7)" }}>
+          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(192, 132, 252, 0.7)" }}>
             Performance Dashboard
           </span>
           <span className="text-[10px] text-[var(--text-dim)]">{trades.length} trades</span>
@@ -79,13 +79,13 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 {/* Large Equity Curve */}
                 <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">Equity Curve</h3>
+                  <h3 className="text-label text-[10px] mb-3">Equity Curve</h3>
                   <LargeEquityCurve data={stats.equityCurve} />
                 </div>
 
                 {/* P&L Distribution */}
                 <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">P&L Distribution</h3>
+                  <h3 className="text-label text-[10px] mb-3">P&L Distribution</h3>
                   <PnlDistribution trades={trades} />
                 </div>
               </div>
@@ -94,7 +94,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
               <div className="grid grid-cols-2 gap-4">
                 {/* Win/Loss Streak */}
                 <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">Streaks & Drawdown</h3>
+                  <h3 className="text-label text-[10px] mb-3">Streaks & Drawdown</h3>
                   <div className="grid grid-cols-2 gap-3 text-[11px]">
                     <StatRow label="Max Win Streak" value={`${stats.maxWinStreak}`} color="var(--green)" />
                     <StatRow label="Max Loss Streak" value={`${stats.maxLoseStreak}`} color="var(--red)" />
@@ -109,7 +109,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
 
                 {/* By Exit Reason */}
                 <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">By Exit Reason</h3>
+                  <h3 className="text-label text-[10px] mb-3">By Exit Reason</h3>
                   <div className="space-y-2">
                     {stats.byExitReason.map((r) => (
                       <div key={r.reason} className="flex items-center gap-3 text-[11px]">
@@ -129,7 +129,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                     ))}
                   </div>
 
-                  <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mt-4 mb-3">By Direction</h3>
+                  <h3 className="text-label text-[10px] mt-4 mb-3">By Direction</h3>
                   <div className="grid grid-cols-2 gap-3 text-[11px]">
                     <StatRow label="Long Trades" value={`${stats.longTrades}`} color="var(--green)" />
                     <StatRow label="Short Trades" value={`${stats.shortTrades}`} color="var(--red)" />
@@ -143,13 +143,13 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
 
               {/* Trade-by-Trade Bars */}
               <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">Trade-by-Trade P&L</h3>
+                <h3 className="text-label text-[10px] mb-3">Trade-by-Trade P&L</h3>
                 <TradeByTradeBars trades={trades} />
               </div>
 
               {/* Full Trade Log */}
               <div className="rounded-lg p-4" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-                <h3 className="text-[10px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-3">Full Trade Log</h3>
+                <h3 className="text-label text-[10px] mb-3">Full Trade Log</h3>
                 <div className="overflow-hidden rounded-lg border border-[var(--border)]">
                   <table className="w-full text-[10px]">
                     <thead>
@@ -204,9 +204,9 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
 
 function MetricCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-lg p-3 text-center" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
-      <div className="text-[8px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1">{label}</div>
-      <div className="text-lg font-mono font-bold" style={{ color }}>{value}</div>
+    <div className="rounded-lg p-3 text-center" style={{ background: "rgba(12, 15, 21, 0.5)", border: "1px solid rgba(255,255,255,0.04)" }}>
+      <div className="text-label mb-1.5" style={{ fontSize: "8px" }}>{label}</div>
+      <div className="text-value text-lg font-bold metric-glow" style={{ color }}>{value}</div>
     </div>
   );
 }

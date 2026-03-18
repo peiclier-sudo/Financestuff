@@ -11,7 +11,7 @@ export default function HourlyStats({ buckets }: Props) {
 
   return (
     <div>
-      <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-2">Hourly Breakdown</h3>
+      <h3 className="text-label mb-2">Hourly Breakdown</h3>
       <div className="overflow-hidden rounded-lg border border-[var(--border)]">
         <table className="w-full text-[10px]">
           <thead>

@@ -464,7 +464,7 @@ export default function BacktestPage() {
             <div className="w-2 h-2 rounded-full bg-[var(--green)]" />
             <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--green)] animate-ping opacity-30" />
           </div>
-          <h1 className="text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
+          <h1 className="font-display text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
         </div>
 
         <div className="w-px h-4 bg-[var(--border)]" />
@@ -681,7 +681,7 @@ function SidePanel({ icon, title, rgb, children }: { icon: string; title: string
         </div>
         <div className="w-px h-2.5" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
         <span className="text-[8px] opacity-35" dangerouslySetInnerHTML={{ __html: icon }} />
-        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.65)` }}>{title}</span>
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.65)` }}>{title}</span>
       </div>
       {/* Content */}
       <div className="p-3">
