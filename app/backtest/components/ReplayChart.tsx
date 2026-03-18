@@ -377,6 +377,44 @@ export default function ReplayChart({
     if (isDayChange || !timeRangeSetRef.current) {
       if (bars.length >= 2) {
         chart.timeScale().setVisibleLogicalRange({ from: -1, to: bars.length });
+
+        // Set a reasonable initial price range so the first candle isn't full-height.
+        // Use the full day's high/low with margin to set the price scale.
+        const allHighs = bars.map((b) => b.high);
+        const allLows = bars.map((b) => b.low);
+        const dayHigh = Math.max(...allHighs);
+        const dayLow = Math.min(...allLows);
+        const margin = (dayHigh - dayLow) * 0.05;
+        chart.priceScale("right").applyOptions({
+          autoScale: false,
+        });
+        // Use a helper series approach: set autoscale off and manually set range
+        // lightweight-charts doesn't have setVisiblePriceRange on priceScale directly,
+        // so we use invisible price lines at top/bottom to anchor the scale
+        const topAnchor = series.createPriceLine({
+          price: dayHigh + margin,
+          color: "#00000000",
+          lineWidth: 1,
+          lineStyle: 0,
+          axisLabelVisible: false,
+          title: "",
+        });
+        const bottomAnchor = series.createPriceLine({
+          price: dayLow - margin,
+          color: "#00000000",
+          lineWidth: 1,
+          lineStyle: 0,
+          axisLabelVisible: false,
+          title: "",
+        });
+        priceLinesRef.current.set("_anchor_top", topAnchor);
+        priceLinesRef.current.set("_anchor_bottom", bottomAnchor);
+
+        // Re-enable autoscale after anchors are set — it will now include them
+        chart.priceScale("right").applyOptions({
+          autoScale: true,
+        });
+
         timeRangeSetRef.current = true;
         prevFirstBarTime.current = firstBarTime;
         savedLogicalRange.current = null;
