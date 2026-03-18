@@ -335,7 +335,7 @@ export default function Home() {
                 <div className="w-2 h-2 rounded-full bg-[var(--accent)]" />
                 <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--accent)] animate-ping opacity-30" />
               </div>
-              <h1 className="text-sm font-bold tracking-tight bg-gradient-to-r from-white via-[var(--text)] to-[var(--text-secondary)] bg-clip-text text-transparent">NDX Day Filter</h1>
+              <h1 className="font-display text-sm font-bold tracking-tight text-gradient-accent">NDX Day Filter</h1>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-px h-3 bg-[var(--border-bright)]" />
@@ -478,7 +478,7 @@ function Panel({ id, children, tabs, isResizing, widthPercent }: { id: string; c
         </div>
         <div className="w-px h-3 bg-[var(--border)]" />
         <span className="text-[9px] opacity-40">{PANEL_ICONS[id]}</span>
-        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{PANEL_TITLES[id]}</span>
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.7)` }}>{PANEL_TITLES[id]}</span>
         {/* Width badge during resize */}
         {isResizing && widthPercent != null && (
           <span className="ml-auto text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded-full" style={{

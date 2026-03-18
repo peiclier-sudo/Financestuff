@@ -129,7 +129,7 @@ export default function OrderPanel({
       {/* Equity Curve */}
       {equityCurve.length >= 2 && (
         <div>
-          <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1">Equity Curve</h3>
+          <h3 className="text-label mb-1">Equity Curve</h3>
           <EquityCurve data={equityCurve} />
         </div>
       )}
@@ -138,7 +138,7 @@ export default function OrderPanel({
       {positions.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Open Positions</h3>
+            <h3 className="text-label">Open Positions</h3>
             {positions.length > 1 && (
               <div className="flex gap-1">
                 <button
@@ -249,7 +249,7 @@ export default function OrderPanel({
       {/* Pending Orders */}
       {pendingOrders.length > 0 && (
         <div>
-          <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1.5">Pending Orders</h3>
+          <h3 className="text-label mb-1.5">Pending Orders</h3>
           <div className="space-y-1">
             {pendingOrders.map((o) => (
               <div key={o.id} className="flex items-center gap-2 p-1.5 rounded-lg" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
@@ -273,7 +273,7 @@ export default function OrderPanel({
       {/* Trade Log */}
       {sessionTrades.length > 0 && (
         <div>
-          <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1.5">Trade Log</h3>
+          <h3 className="text-label mb-1.5">Trade Log</h3>
           <div className="space-y-0.5 max-h-32 overflow-y-auto">
             {[...sessionTrades].reverse().map((t) => (
               <div key={t.id} className="flex items-center gap-2 py-0.5 text-[10px]">

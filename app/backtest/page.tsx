@@ -464,7 +464,7 @@ export default function BacktestPage() {
             <div className="w-2 h-2 rounded-full bg-[var(--green)]" />
             <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--green)] animate-ping opacity-30" />
           </div>
-          <h1 className="text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
+          <h1 className="font-display text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
         </div>
 
         <div className="w-px h-4 bg-[var(--border)]" />
@@ -549,33 +549,33 @@ export default function BacktestPage() {
             </div>
           )}
 
-          {/* Action buttons — bottom-left of chart, away from price axis */}
+          {/* Action buttons — bottom-right, offset from axis */}
           {currentDay && !dayComplete && (
-            <div className="absolute bottom-3 left-3 z-40 flex items-center gap-1.5">
+            <div className="absolute bottom-2 z-40 flex items-center gap-1" style={{ right: "90px" }}>
               <button
                 onClick={() => {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
                   if (price) handlePlaceOrder(price, "long", "market");
                 }}
-                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
-                style={{ background: "#3fb95020", color: "#3fb950", border: "1px solid #3fb95040" }}
+                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
+                style={{ background: "rgba(63, 185, 80, 0.12)", color: "#3fb950", border: "1px solid rgba(63, 185, 80, 0.2)", backdropFilter: "blur(8px)" }}
               >
                 BUY
               </button>
               <button
                 onClick={advanceBar}
-                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
-                style={{ background: "#58a6ff15", color: "#58a6ff", border: "1px solid #58a6ff40" }}
+                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
+                style={{ background: "rgba(88, 166, 255, 0.1)", color: "#58a6ff", border: "1px solid rgba(88, 166, 255, 0.2)", backdropFilter: "blur(8px)" }}
               >
-                Next Bar &rarr;
+                Next &rarr;
               </button>
               <button
                 onClick={() => {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
                   if (price) handlePlaceOrder(price, "short", "market");
                 }}
-                className="px-3 py-1.5 rounded text-[11px] font-bold transition-colors"
-                style={{ background: "#f8514920", color: "#f85149", border: "1px solid #f8514940" }}
+                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
+                style={{ background: "rgba(248, 81, 73, 0.12)", color: "#f85149", border: "1px solid rgba(248, 81, 73, 0.2)", backdropFilter: "blur(8px)" }}
               >
                 SHORT
               </button>
@@ -681,7 +681,7 @@ function SidePanel({ icon, title, rgb, children }: { icon: string; title: string
         </div>
         <div className="w-px h-2.5" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
         <span className="text-[8px] opacity-35" dangerouslySetInnerHTML={{ __html: icon }} />
-        <span className="text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.65)` }}>{title}</span>
+        <span className="font-display text-[9px] font-semibold uppercase tracking-[0.12em]" style={{ color: `rgba(${rgb}, 0.65)` }}>{title}</span>
       </div>
       {/* Content */}
       <div className="p-3">

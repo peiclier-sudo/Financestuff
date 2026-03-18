@@ -16,7 +16,7 @@ export default function DayCharacteristics({ day, stats }: Props) {
     <div className="space-y-3 text-[11px]">
       {/* Day Characteristics */}
       <div>
-        <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-2">Day Parameters</h3>
+        <h3 className="text-label mb-2">Day Parameters</h3>
         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
           <Param label="Day" value={day.dayName} />
           <Param
@@ -39,8 +39,8 @@ export default function DayCharacteristics({ day, stats }: Props) {
 
       {/* Historical Stats */}
       <div>
-        <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-2">
-          Historical Match <span className="text-[var(--accent)]">({stats.sampleSize} days)</span>
+        <h3 className="text-label mb-2">
+          Historical Match <span style={{ color: "var(--accent)" }}>({stats.sampleSize} days)</span>
         </h3>
 
         {stats.sampleSize === 0 ? (
