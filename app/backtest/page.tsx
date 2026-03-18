@@ -610,8 +610,8 @@ export default function BacktestPage() {
         </div>
 
         {/* Right Panel (~30%) */}
-        <div className="w-[420px] flex-shrink-0 border-l overflow-y-auto" style={{ background: "rgba(12, 15, 21, 0.5)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
-          <div className="p-2 space-y-2 panel-focus-group">
+        <div className="w-[420px] flex-shrink-0 border-l overflow-y-auto overflow-x-hidden" style={{ background: "rgba(12, 15, 21, 0.5)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+          <div className="p-3 space-y-2 panel-focus-group">
             {/* Pool Filter (collapsible) */}
             {showFilter && (
               <SidePanel icon="&#9881;" title="Pool Filter" rgb="160, 170, 190">
@@ -676,7 +676,7 @@ export default function BacktestPage() {
 
 function SidePanel({ icon, title, rgb, children }: { icon: string; title: string; rgb: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col rounded-lg overflow-hidden panel-focus corner-accent" style={{
+    <div className="flex flex-col rounded-lg overflow-hidden panel-focus" style={{
       background: `linear-gradient(160deg, rgba(12, 15, 21, 0.72), rgba(18, 22, 30, 0.55))`,
       backdropFilter: "blur(20px) saturate(1.3)",
       WebkitBackdropFilter: "blur(20px) saturate(1.3)",
