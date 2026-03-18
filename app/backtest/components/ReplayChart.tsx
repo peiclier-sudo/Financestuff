@@ -27,9 +27,10 @@ interface TradeLabel {
   time: number;
   price: number;
   text: string;
+  detail: string; // hover tooltip: breakdown of individual trades
   color: string;
   bgColor: string;
-  above: boolean; // above or below the bar
+  above: boolean;
 }
 
 interface Props {
@@ -79,6 +80,8 @@ export default function ReplayChart({
   const [dragging, setDragging] = useState<DragLine | null>(null);
   const [tradeLabels, setTradeLabels] = useState<TradeLabel[]>([]);
   const [labelPositions, setLabelPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const [posLabels, setPosLabels] = useState<{ id: string; price: number; text: string; direction: string; pnl: number }[]>([]);
+  const [posLabelPositions, setPosLabelPositions] = useState<Map<string, number>>(new Map()); // id -> y coordinate
   const lastCrosshairPrice = useRef<number>(0);
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
@@ -273,32 +276,41 @@ export default function ReplayChart({
     const hasUnifiedSL = slValues.size === 1 && positions.length > 1 && positions.every((p) => p.stopLoss != null);
     const hasUnifiedTP = tpValues.size === 1 && positions.length > 1 && positions.every((p) => p.takeProfit != null);
 
+    // Position entry lines — clean, no title (PnL shown via HTML overlay)
+    const newPosLabels: typeof posLabels = [];
     positions.forEach((p) => {
-      // Entry — show direction + unrealized P&L
       const mult = p.direction === "long" ? 1 : -1;
       const pnl = (currentPrice - p.entryPrice) * mult;
-      const pnlStr = `${pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}`;
+      const pnlColor = pnl >= 0 ? "#3fb95090" : "#f8514990";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
-        color: p.direction === "long" ? "#3fb950" : "#f85149",
-        lineWidth: 1,
-        lineStyle: 0,
+        color: pnlColor,
+        lineWidth: 2,
+        lineStyle: 2, // dashed — smoother than solid for entries
         axisLabelVisible: true,
-        title: `${p.direction === "long" ? "L" : "S"} ${pnlStr}`,
-        axisLabelColor: p.direction === "long" ? "#3fb950" : "#f85149",
+        title: "",
+        axisLabelColor: pnl >= 0 ? "#3fb950" : "#f85149",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
 
-      // Only show individual SL/TP if not unified
+      newPosLabels.push({
+        id: p.id,
+        price: p.entryPrice,
+        text: `${pnl >= 0 ? "+" : ""}$${pnl.toFixed(1)}`,
+        direction: p.direction,
+        pnl,
+      });
+
+      // SL/TP: smooth dashed lines (lineStyle 2), slightly transparent
       if (p.stopLoss != null && !hasUnifiedSL) {
         const slPl = series.createPriceLine({
           price: p.stopLoss,
-          color: "#f85149",
+          color: "#f8514960",
           lineWidth: 1,
-          lineStyle: 3,
+          lineStyle: 2,
           axisLabelVisible: true,
-          title: "SL",
+          title: "",
           axisLabelColor: "#f85149",
           axisLabelTextColor: "#0d1117",
         });
@@ -308,27 +320,28 @@ export default function ReplayChart({
       if (p.takeProfit != null && !hasUnifiedTP) {
         const tpPl = series.createPriceLine({
           price: p.takeProfit,
-          color: "#3fb950",
+          color: "#3fb95060",
           lineWidth: 1,
-          lineStyle: 3,
+          lineStyle: 2,
           axisLabelVisible: true,
-          title: "TP",
+          title: "",
           axisLabelColor: "#3fb950",
           axisLabelTextColor: "#0d1117",
         });
         priceLinesRef.current.set(`pos-tp-${p.id}`, tpPl);
       }
     });
+    setPosLabels(newPosLabels);
 
-    // Unified SL/TP lines (single line for all positions)
+    // Unified SL/TP lines — smooth dashed, slightly bolder
     if (hasUnifiedSL && unifiedSL != null) {
       const slPl = series.createPriceLine({
         price: unifiedSL,
-        color: "#f85149",
+        color: "#f8514980",
         lineWidth: 2,
-        lineStyle: 0,
+        lineStyle: 2,
         axisLabelVisible: true,
-        title: `SL (${positions.length})`,
+        title: "",
         axisLabelColor: "#f85149",
         axisLabelTextColor: "#0d1117",
       });
@@ -337,51 +350,61 @@ export default function ReplayChart({
     if (hasUnifiedTP && unifiedTP != null) {
       const tpPl = series.createPriceLine({
         price: unifiedTP,
-        color: "#3fb950",
+        color: "#3fb95080",
         lineWidth: 2,
-        lineStyle: 0,
+        lineStyle: 2,
         axisLabelVisible: true,
-        title: `TP (${positions.length})`,
+        title: "",
         axisLabelColor: "#3fb950",
         axisLabelTextColor: "#0d1117",
       });
       priceLinesRef.current.set("unified-tp", tpPl);
     }
 
-    // Compute trade labels for HTML overlay (replaces built-in markers)
+    // Compute position label Y coordinates
+    const newPosLabelPos = new Map<string, number>();
+    for (const pl of newPosLabels) {
+      const y = series.priceToCoordinate(pl.price);
+      if (y !== null) newPosLabelPos.set(pl.id, y as number);
+    }
+    setPosLabelPositions(newPosLabelPos);
+
+    // Compute trade labels — only PnL, merge exits on the same bar
     const labels: TradeLabel[] = [];
     if (closedTrades.length > 0 && revealedBars.length > 0) {
       const dayStart = bars[0].time;
       const dayEnd = bars[bars.length - 1].time;
+
+      // Group exits by bar index to merge same-bar exits
+      const exitGroups = new Map<number, { trades: ClosedTrade[]; bar: Bar }>();
       for (const t of closedTrades) {
         if (t.entryTime < dayStart || t.entryTime > dayEnd) continue;
-        const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
         const exitIdx = findClosestBarIndex(revealedBars, t.exitTime);
-        if (entryIdx >= 0 && exitIdx >= 0 && exitIdx < revealedBars.length) {
-          const entryBar = revealedBars[entryIdx];
-          const exitBar = revealedBars[exitIdx];
-          // Entry label
-          labels.push({
-            id: `entry-${t.id}`,
-            time: entryBar.time,
-            price: t.direction === "long" ? entryBar.low : entryBar.high,
-            text: `${t.entryPrice.toFixed(0)}`,
-            color: "#8b949e",
-            bgColor: "rgba(22, 27, 34, 0.85)",
-            above: t.direction === "short",
-          });
-          // Exit label
-          const exitColor = t.pnlPoints >= 0 ? "#3fb950" : "#f85149";
-          labels.push({
-            id: `exit-${t.id}`,
-            time: exitBar.time,
-            price: t.direction === "long" ? exitBar.high : exitBar.low,
-            text: `${t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}`,
-            color: exitColor,
-            bgColor: t.pnlPoints >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
-            above: t.direction === "long",
-          });
+        if (exitIdx >= 0 && exitIdx < revealedBars.length) {
+          const group = exitGroups.get(exitIdx) || { trades: [], bar: revealedBars[exitIdx] };
+          group.trades.push(t);
+          exitGroups.set(exitIdx, group);
         }
+      }
+
+      // Create one label per exit group (merged)
+      for (const [, group] of exitGroups) {
+        const totalPnl = group.trades.reduce((s, t) => s + t.pnlPoints, 0);
+        const color = totalPnl >= 0 ? "#3fb950" : "#f85149";
+        // Detail for hover: show each trade's PnL
+        const detail = group.trades.length > 1
+          ? group.trades.map((t) => `${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(1)}`).join(" + ") + ` = ${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`
+          : "";
+        labels.push({
+          id: `exit-${group.trades.map((t) => t.id).join("-")}`,
+          time: group.bar.time,
+          price: totalPnl >= 0 ? group.bar.high : group.bar.low,
+          text: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toFixed(1)}`,
+          detail,
+          color,
+          bgColor: totalPnl >= 0 ? "rgba(63, 185, 80, 0.1)" : "rgba(248, 81, 73, 0.1)",
+          above: totalPnl >= 0,
+        });
       }
     }
     setTradeLabels(labels);
@@ -457,9 +480,11 @@ export default function ReplayChart({
   useEffect(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
-    if (!chart || !series || tradeLabels.length === 0) return;
+    if (!chart || !series) return;
+    if (tradeLabels.length === 0 && posLabels.length === 0) return;
 
     const updatePositions = () => {
+      // Trade exit labels
       const newPos = new Map<string, { x: number; y: number }>();
       for (const label of tradeLabels) {
         const x = chart.timeScale().timeToCoordinate(label.time as UTCTimestamp);
@@ -469,6 +494,14 @@ export default function ReplayChart({
         }
       }
       setLabelPositions(newPos);
+
+      // Position PnL labels (only need Y coordinate)
+      const newPosPos = new Map<string, number>();
+      for (const pl of posLabels) {
+        const y = series.priceToCoordinate(pl.price);
+        if (y !== null) newPosPos.set(pl.id, y as number);
+      }
+      setPosLabelPositions(newPosPos);
     };
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(updatePositions);
@@ -476,7 +509,7 @@ export default function ReplayChart({
     return () => {
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updatePositions); } catch {}
     };
-  }, [tradeLabels]);
+  }, [tradeLabels, posLabels]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -703,6 +736,40 @@ export default function ReplayChart({
         style={{ cursor: dragging ? "ns-resize" : "crosshair" }}
       />
 
+      {/* Position PnL labels — large, aesthetic blocks pinned to left edge */}
+      {posLabels.map((pl) => {
+        const y = posLabelPositions.get(pl.id);
+        if (y == null) return null;
+        const isProfit = pl.pnl >= 0;
+        const color = isProfit ? "#3fb950" : "#f85149";
+        const bgColor = isProfit ? "rgba(63, 185, 80, 0.08)" : "rgba(248, 81, 73, 0.08)";
+        const borderColor = isProfit ? "rgba(63, 185, 80, 0.2)" : "rgba(248, 81, 73, 0.2)";
+        return (
+          <div
+            key={`pos-label-${pl.id}`}
+            className="absolute z-30 pointer-events-none"
+            style={{ left: 12, top: y, transform: "translateY(-50%)" }}
+          >
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md"
+              style={{
+                background: bgColor,
+                border: `1px solid ${borderColor}`,
+                backdropFilter: "blur(8px)",
+                boxShadow: `0 0 12px ${isProfit ? "rgba(63, 185, 80, 0.06)" : "rgba(248, 81, 73, 0.06)"}`,
+              }}
+            >
+              <span className="text-[9px] font-semibold uppercase opacity-50" style={{ color }}>
+                {pl.direction === "long" ? "L" : "S"}
+              </span>
+              <span className="text-[13px] font-mono font-bold tracking-tight" style={{ color, textShadow: `0 0 8px ${color}40` }}>
+                {pl.text}
+              </span>
+            </div>
+          </div>
+        );
+      })}
+
       {/* Trade labels — discreet positioned HTML bubbles */}
       {tradeLabels.map((label) => {
         const pos = labelPositions.get(label.id);
@@ -711,11 +778,12 @@ export default function ReplayChart({
         return (
           <div
             key={label.id}
-            className="absolute z-30 pointer-events-none"
+            className="absolute z-30 group/label"
             style={{
               left: pos.x,
               top: pos.y + offsetY,
               transform: "translateX(-50%)",
+              pointerEvents: label.detail ? "auto" : "none",
             }}
           >
             <div
@@ -729,6 +797,22 @@ export default function ReplayChart({
             >
               {label.text}
             </div>
+            {/* Hover detail for merged exits */}
+            {label.detail && (
+              <div
+                className="absolute left-1/2 -translate-x-1/2 opacity-0 group-hover/label:opacity-100 transition-opacity pointer-events-none z-50 whitespace-nowrap"
+                style={{
+                  [label.above ? "bottom" : "top"]: "100%",
+                  marginBottom: label.above ? "4px" : undefined,
+                  marginTop: label.above ? undefined : "4px",
+                }}
+              >
+                <div className="px-2 py-1 rounded text-[7px] font-mono"
+                  style={{ background: "rgba(12, 15, 21, 0.9)", border: "1px solid rgba(255,255,255,0.08)", color: "#8b949e", backdropFilter: "blur(8px)" }}>
+                  {label.detail}
+                </div>
+              </div>
+            )}
           </div>
         );
       })}

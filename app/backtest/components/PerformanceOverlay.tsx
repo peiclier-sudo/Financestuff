@@ -57,12 +57,12 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
             <div className="space-y-5">
               {/* Key Metrics Row */}
               <div className="grid grid-cols-6 gap-3">
-                <MetricCard label="Total P&L" value={`${stats.totalPnl >= 0 ? "+" : ""}${stats.totalPnl.toFixed(1)}`} color={stats.totalPnl >= 0 ? "var(--green)" : "var(--red)"} />
+                <MetricCard label="Total P&L" value={`${stats.totalPnl >= 0 ? "+" : ""}$${stats.totalPnl.toFixed(1)}`} color={stats.totalPnl >= 0 ? "var(--green)" : "var(--red)"} />
                 <MetricCard label="Win Rate" value={`${stats.winRate.toFixed(1)}%`} color={stats.winRate >= 50 ? "var(--green)" : "var(--red)"} />
                 <MetricCard label="Profit Factor" value={stats.profitFactor === Infinity ? "—" : stats.profitFactor.toFixed(2)} color={stats.profitFactor >= 1 ? "var(--green)" : "var(--red)"} />
-                <MetricCard label="Avg Win" value={stats.avgWin > 0 ? `+${stats.avgWin.toFixed(1)}` : "—"} color="var(--green)" />
-                <MetricCard label="Avg Loss" value={stats.avgLoss < 0 ? stats.avgLoss.toFixed(1) : "—"} color="var(--red)" />
-                <MetricCard label="Expectancy" value={`${stats.expectancy >= 0 ? "+" : ""}${stats.expectancy.toFixed(2)}`} color={stats.expectancy >= 0 ? "var(--green)" : "var(--red)"} />
+                <MetricCard label="Avg Win" value={stats.avgWin > 0 ? `+$${stats.avgWin.toFixed(1)}` : "—"} color="var(--green)" />
+                <MetricCard label="Avg Loss" value={stats.avgLoss < 0 ? `$${stats.avgLoss.toFixed(1)}` : "—"} color="var(--red)" />
+                <MetricCard label="Expectancy" value={`${stats.expectancy >= 0 ? "+" : ""}$${stats.expectancy.toFixed(2)}`} color={stats.expectancy >= 0 ? "var(--green)" : "var(--red)"} />
               </div>
 
               {/* Secondary Metrics */}
@@ -70,8 +70,8 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                 <MetricCard label="Total Trades" value={`${stats.totalTrades}`} color="var(--text)" />
                 <MetricCard label="Winners" value={`${stats.winners}`} color="var(--green)" />
                 <MetricCard label="Losers" value={`${stats.losers}`} color="var(--red)" />
-                <MetricCard label="Best Trade" value={`+${stats.bestTrade.toFixed(1)}`} color="var(--green)" />
-                <MetricCard label="Worst Trade" value={stats.worstTrade.toFixed(1)} color="var(--red)" />
+                <MetricCard label="Best Trade" value={`+$${stats.bestTrade.toFixed(1)}`} color="var(--green)" />
+                <MetricCard label="Worst Trade" value={`$${stats.worstTrade.toFixed(1)}`} color="var(--red)" />
                 <MetricCard label="R:R Ratio" value={stats.avgWin > 0 && stats.avgLoss < 0 ? (stats.avgWin / Math.abs(stats.avgLoss)).toFixed(2) : "—"} color="var(--text)" />
               </div>
 
@@ -98,10 +98,10 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                   <div className="grid grid-cols-2 gap-3 text-[11px]">
                     <StatRow label="Max Win Streak" value={`${stats.maxWinStreak}`} color="var(--green)" />
                     <StatRow label="Max Loss Streak" value={`${stats.maxLoseStreak}`} color="var(--red)" />
-                    <StatRow label="Max Drawdown" value={stats.maxDrawdown.toFixed(1)} color="var(--red)" />
-                    <StatRow label="Max Runup" value={`+${stats.maxRunup.toFixed(1)}`} color="var(--green)" />
-                    <StatRow label="Avg Trade" value={`${stats.avgTrade >= 0 ? "+" : ""}${stats.avgTrade.toFixed(2)}`} color={stats.avgTrade >= 0 ? "var(--green)" : "var(--red)"} />
-                    <StatRow label="Median Trade" value={`${stats.medianTrade >= 0 ? "+" : ""}${stats.medianTrade.toFixed(2)}`} color={stats.medianTrade >= 0 ? "var(--green)" : "var(--red)"} />
+                    <StatRow label="Max Drawdown" value={`$${stats.maxDrawdown.toFixed(1)}`} color="var(--red)" />
+                    <StatRow label="Max Runup" value={`+$${stats.maxRunup.toFixed(1)}`} color="var(--green)" />
+                    <StatRow label="Avg Trade" value={`${stats.avgTrade >= 0 ? "+" : ""}$${stats.avgTrade.toFixed(2)}`} color={stats.avgTrade >= 0 ? "var(--green)" : "var(--red)"} />
+                    <StatRow label="Median Trade" value={`${stats.medianTrade >= 0 ? "+" : ""}$${stats.medianTrade.toFixed(2)}`} color={stats.medianTrade >= 0 ? "var(--green)" : "var(--red)"} />
                     <StatRow label="Std Dev" value={stats.stdDev.toFixed(2)} color="var(--text-secondary)" />
                     <StatRow label="Sharpe (approx)" value={stats.sharpe.toFixed(2)} color={stats.sharpe >= 0 ? "var(--green)" : "var(--red)"} />
                   </div>
@@ -123,7 +123,7 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                         </div>
                         <span className="text-[10px] text-[var(--text-dim)] w-6 text-right">{r.count}</span>
                         <span className="text-[10px] font-mono font-semibold w-16 text-right" style={{ color: r.pnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                          {r.pnl >= 0 ? "+" : ""}{r.pnl.toFixed(1)}
+                          {r.pnl >= 0 ? "+" : ""}${r.pnl.toFixed(1)}
                         </span>
                       </div>
                     ))}
@@ -133,8 +133,8 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                   <div className="grid grid-cols-2 gap-3 text-[11px]">
                     <StatRow label="Long Trades" value={`${stats.longTrades}`} color="var(--green)" />
                     <StatRow label="Short Trades" value={`${stats.shortTrades}`} color="var(--red)" />
-                    <StatRow label="Long P&L" value={`${stats.longPnl >= 0 ? "+" : ""}${stats.longPnl.toFixed(1)}`} color={stats.longPnl >= 0 ? "var(--green)" : "var(--red)"} />
-                    <StatRow label="Short P&L" value={`${stats.shortPnl >= 0 ? "+" : ""}${stats.shortPnl.toFixed(1)}`} color={stats.shortPnl >= 0 ? "var(--green)" : "var(--red)"} />
+                    <StatRow label="Long P&L" value={`${stats.longPnl >= 0 ? "+" : ""}$${stats.longPnl.toFixed(1)}`} color={stats.longPnl >= 0 ? "var(--green)" : "var(--red)"} />
+                    <StatRow label="Short P&L" value={`${stats.shortPnl >= 0 ? "+" : ""}$${stats.shortPnl.toFixed(1)}`} color={stats.shortPnl >= 0 ? "var(--green)" : "var(--red)"} />
                     <StatRow label="Long Win%" value={stats.longTrades > 0 ? `${stats.longWinRate.toFixed(0)}%` : "—"} color={stats.longWinRate >= 50 ? "var(--green)" : "var(--red)"} />
                     <StatRow label="Short Win%" value={stats.shortTrades > 0 ? `${stats.shortWinRate.toFixed(0)}%` : "—"} color={stats.shortWinRate >= 50 ? "var(--green)" : "var(--red)"} />
                   </div>
@@ -177,10 +177,10 @@ export default function PerformanceOverlay({ trades, onClose }: Props) {
                             <td className="py-1.5 px-3 text-right font-mono text-[var(--text-secondary)]">{t.entryPrice.toFixed(1)}</td>
                             <td className="py-1.5 px-3 text-right font-mono text-[var(--text-secondary)]">{t.exitPrice.toFixed(1)}</td>
                             <td className="py-1.5 px-3 text-right font-mono font-semibold" style={{ color: t.pnlPoints >= 0 ? "var(--green)" : "var(--red)" }}>
-                              {t.pnlPoints >= 0 ? "+" : ""}{t.pnlPoints.toFixed(1)}
+                              {t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}
                             </td>
                             <td className="py-1.5 px-3 text-right font-mono" style={{ color: cumPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                              {cumPnl >= 0 ? "+" : ""}{cumPnl.toFixed(1)}
+                              {cumPnl >= 0 ? "+" : ""}${cumPnl.toFixed(1)}
                             </td>
                             <td className="py-1.5 px-3 text-[9px] uppercase text-[var(--text-dim)]">{t.exitReason}</td>
                           </tr>

@@ -85,7 +85,7 @@ export default function OrderPanel({
           <div className="text-center p-2 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
             <div className="text-label" style={{ fontSize: "8px" }}>P&L</div>
             <div className="text-value font-bold text-[13px] metric-glow" style={{ color: totalPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-              {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}
+              {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(1)}
             </div>
           </div>
         </div>
@@ -108,13 +108,13 @@ export default function OrderPanel({
           <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
             <div className="text-[8px] text-[var(--text-dim)]">Avg Win</div>
             <div className="text-[10px] font-mono" style={{ color: "var(--green)" }}>
-              {winners > 0 ? `+${avgWin.toFixed(1)}` : "—"}
+              {winners > 0 ? `+$${avgWin.toFixed(1)}` : "—"}
             </div>
           </div>
           <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
             <div className="text-[8px] text-[var(--text-dim)]">Avg Loss</div>
             <div className="text-[10px] font-mono" style={{ color: "var(--red)" }}>
-              {losers > 0 ? avgLoss.toFixed(1) : "—"}
+              {losers > 0 ? `$${avgLoss.toFixed(1)}` : "—"}
             </div>
           </div>
           <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
@@ -190,7 +190,7 @@ export default function OrderPanel({
                   </span>
                   <span className="font-mono text-[var(--text-secondary)]">{p.entryPrice.toFixed(1)}</span>
                   <span className="font-mono font-semibold" style={{ color: pnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                    {pnl >= 0 ? "+" : ""}{pnl.toFixed(1)}
+                    {pnl >= 0 ? "+" : ""}${pnl.toFixed(1)}
                   </span>
                   <div className="ml-auto flex gap-1">
                     <button
@@ -239,7 +239,7 @@ export default function OrderPanel({
             })}
             <div className="text-[10px] text-[var(--text-dim)]">
               Unrealized: <span className="font-mono" style={{ color: unrealizedPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                {unrealizedPnl >= 0 ? "+" : ""}{unrealizedPnl.toFixed(1)}
+                {unrealizedPnl >= 0 ? "+" : ""}${unrealizedPnl.toFixed(1)}
               </span>
             </div>
           </div>
@@ -282,7 +282,7 @@ export default function OrderPanel({
                 </span>
                 <span className="text-[var(--text-dim)]">{t.entryPrice.toFixed(0)}-{t.exitPrice.toFixed(0)}</span>
                 <span className="font-mono font-semibold" style={{ color: t.pnlPoints >= 0 ? "var(--green)" : "var(--red)" }}>
-                  {t.pnlPoints >= 0 ? "+" : ""}{t.pnlPoints.toFixed(1)}
+                  {t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(1)}
                 </span>
                 <span className="text-[var(--text-dim)] text-[9px] uppercase">{t.exitReason}</span>
               </div>
