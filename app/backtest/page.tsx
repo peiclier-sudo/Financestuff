@@ -460,10 +460,7 @@ export default function BacktestPage() {
         <div className="w-px h-4 bg-[var(--border)]" />
 
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <div className="w-2 h-2 rounded-full bg-[var(--green)]" />
-            <div className="absolute inset-0 w-2 h-2 rounded-full bg-[var(--green)] animate-ping opacity-30" />
-          </div>
+          <div className="w-2 h-2 rounded-full glow-dot" style={{ background: "var(--green)", color: "var(--green)" }} />
           <h1 className="font-display text-xs font-bold tracking-tight text-[var(--text)]">Manual Backtest</h1>
         </div>
 
@@ -513,8 +510,8 @@ export default function BacktestPage() {
 
       {/* Main Content */}
       <div className="flex-1 min-h-0 flex">
-        {/* Chart Area (left ~70%) */}
-        <div className="flex-1 min-w-0 relative">
+        {/* Chart Area */}
+        <div className="flex-1 min-w-0 relative dot-grid">
           {currentDay ? (
             <ReplayChart
               bars={currentDay.bars}
@@ -551,21 +548,33 @@ export default function BacktestPage() {
 
           {/* Action buttons — bottom-right, offset from axis */}
           {currentDay && !dayComplete && (
-            <div className="absolute bottom-2 z-40 flex items-center gap-1" style={{ right: "90px" }}>
+            <div className="absolute bottom-3 z-40 flex items-center gap-2" style={{ right: "96px" }}>
               <button
                 onClick={() => {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
                   if (price) handlePlaceOrder(price, "long", "market");
                 }}
-                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
-                style={{ background: "rgba(63, 185, 80, 0.12)", color: "#3fb950", border: "1px solid rgba(63, 185, 80, 0.2)", backdropFilter: "blur(8px)" }}
+                className="action-btn-buy font-display px-5 py-2.5 rounded-lg text-xs font-bold tracking-wide transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, rgba(0, 230, 118, 0.15), rgba(63, 185, 80, 0.08))",
+                  color: "#3fb950",
+                  border: "1px solid rgba(63, 185, 80, 0.25)",
+                  backdropFilter: "blur(12px)",
+                  boxShadow: "0 0 20px rgba(63, 185, 80, 0.08), inset 0 1px 0 rgba(255,255,255,0.05)",
+                }}
               >
-                BUY
+                BUY <span className="text-[9px] opacity-50 ml-1">M</span>
               </button>
               <button
                 onClick={advanceBar}
-                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
-                style={{ background: "rgba(88, 166, 255, 0.1)", color: "#58a6ff", border: "1px solid rgba(88, 166, 255, 0.2)", backdropFilter: "blur(8px)" }}
+                className="font-display px-6 py-2.5 rounded-lg text-xs font-bold tracking-wide transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(88, 166, 255, 0.06))",
+                  color: "#58a6ff",
+                  border: "1px solid rgba(88, 166, 255, 0.25)",
+                  backdropFilter: "blur(12px)",
+                  boxShadow: "0 0 20px rgba(88, 166, 255, 0.08), inset 0 1px 0 rgba(255,255,255,0.05)",
+                }}
               >
                 Next &rarr;
               </button>
@@ -574,10 +583,16 @@ export default function BacktestPage() {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
                   if (price) handlePlaceOrder(price, "short", "market");
                 }}
-                className="px-2 py-1 rounded text-[9px] font-bold transition-all hover:brightness-125"
-                style={{ background: "rgba(248, 81, 73, 0.12)", color: "#f85149", border: "1px solid rgba(248, 81, 73, 0.2)", backdropFilter: "blur(8px)" }}
+                className="action-btn-sell font-display px-5 py-2.5 rounded-lg text-xs font-bold tracking-wide transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: "linear-gradient(135deg, rgba(255, 82, 82, 0.15), rgba(248, 81, 73, 0.08))",
+                  color: "#f85149",
+                  border: "1px solid rgba(248, 81, 73, 0.25)",
+                  backdropFilter: "blur(12px)",
+                  boxShadow: "0 0 20px rgba(248, 81, 73, 0.08), inset 0 1px 0 rgba(255,255,255,0.05)",
+                }}
               >
-                SHORT
+                SELL <span className="text-[9px] opacity-50 ml-1">N</span>
               </button>
             </div>
           )}
@@ -595,7 +610,7 @@ export default function BacktestPage() {
         </div>
 
         {/* Right Panel (~30%) */}
-        <div className="w-80 flex-shrink-0 border-l overflow-y-auto" style={{ background: "rgba(12, 15, 21, 0.5)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
+        <div className="w-[420px] flex-shrink-0 border-l overflow-y-auto" style={{ background: "rgba(12, 15, 21, 0.5)", borderColor: "rgba(255, 255, 255, 0.04)" }}>
           <div className="p-2 space-y-2 panel-focus-group">
             {/* Pool Filter (collapsible) */}
             {showFilter && (
@@ -661,7 +676,7 @@ export default function BacktestPage() {
 
 function SidePanel({ icon, title, rgb, children }: { icon: string; title: string; rgb: string; children: React.ReactNode }) {
   return (
-    <div className="flex flex-col rounded-lg overflow-hidden panel-focus" style={{
+    <div className="flex flex-col rounded-lg overflow-hidden panel-focus corner-accent" style={{
       background: `linear-gradient(160deg, rgba(12, 15, 21, 0.72), rgba(18, 22, 30, 0.55))`,
       backdropFilter: "blur(20px) saturate(1.3)",
       WebkitBackdropFilter: "blur(20px) saturate(1.3)",

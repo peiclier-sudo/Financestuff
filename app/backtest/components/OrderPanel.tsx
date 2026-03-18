@@ -71,20 +71,20 @@ export default function OrderPanel({
     <div className="space-y-3 text-[11px]">
       {/* Session Summary — clickable to expand */}
       <div className="relative">
-        <div className="flex gap-3 cursor-pointer group" onClick={onExpandResults}>
-          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
-            <div className="text-[9px] text-[var(--text-dim)]">Trades</div>
-            <div className="font-semibold text-[var(--text)]">{sessionTrades.length}</div>
+        <div className="grid grid-cols-3 gap-2 cursor-pointer group" onClick={onExpandResults}>
+          <div className="text-center p-2 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="text-label" style={{ fontSize: "8px" }}>Trades</div>
+            <div className="text-value font-bold text-[13px] text-[var(--text)]">{sessionTrades.length}</div>
           </div>
-          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
-            <div className="text-[9px] text-[var(--text-dim)]">Win Rate</div>
-            <div className="font-semibold" style={{ color: winRate >= 50 ? "var(--green)" : "var(--red)" }}>
+          <div className="text-center p-2 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="text-label" style={{ fontSize: "8px" }}>Win Rate</div>
+            <div className="text-value font-bold text-[13px]" style={{ color: winRate >= 50 ? "var(--green)" : "var(--red)" }}>
               {sessionTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
             </div>
           </div>
-          <div className="flex-1 text-center p-1.5 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)" }}>
-            <div className="text-[9px] text-[var(--text-dim)]">P&L</div>
-            <div className="font-mono font-semibold" style={{ color: totalPnl >= 0 ? "var(--green)" : "var(--red)" }}>
+          <div className="text-center p-2 rounded-lg transition-colors group-hover:brightness-125" style={{ background: "var(--surface)", border: "1px solid var(--border)" }}>
+            <div className="text-label" style={{ fontSize: "8px" }}>P&L</div>
+            <div className="text-value font-bold text-[13px] metric-glow" style={{ color: totalPnl >= 0 ? "var(--green)" : "var(--red)" }}>
               {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(1)}
             </div>
           </div>

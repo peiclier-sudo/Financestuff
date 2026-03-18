@@ -17,7 +17,7 @@ export default function DayCharacteristics({ day, stats }: Props) {
       {/* Day Characteristics */}
       <div>
         <h3 className="text-label mb-2">Day Parameters</h3>
-        <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+        <div className="grid grid-cols-4 gap-x-3 gap-y-2">
           <Param label="Day" value={day.dayName} />
           <Param
             label="Prev Direction"
@@ -85,8 +85,8 @@ export default function DayCharacteristics({ day, stats }: Props) {
 function Param({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div>
-      <span className="text-[var(--text-dim)] text-[9px]">{label}</span>
-      <div className="font-semibold text-[11px]" style={{ color: color || "var(--text)" }}>{value}</div>
+      <span className="text-label" style={{ fontSize: "8px" }}>{label}</span>
+      <div className="font-display font-semibold text-[11px]" style={{ color: color || "var(--text)" }}>{value}</div>
     </div>
   );
 }
@@ -94,8 +94,8 @@ function Param({ label, value, color }: { label: string; value: string; color?: 
 function StatRow({ label, value, color }: { label: string; value: string; color?: string }) {
   return (
     <div className="flex justify-between">
-      <span className="text-[var(--text-dim)]">{label}</span>
-      <span className="font-mono font-semibold" style={{ color: color || "var(--text-secondary)" }}>{value}</span>
+      <span className="text-[var(--text-dim)] text-[10px]">{label}</span>
+      <span className="text-value font-semibold" style={{ color: color || "var(--text-secondary)" }}>{value}</span>
     </div>
   );
 }
