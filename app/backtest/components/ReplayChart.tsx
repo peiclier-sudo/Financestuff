@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import {
   createChart,
+  createSeriesMarkers,
   CandlestickSeries,
   type IChartApi,
   type ISeriesApi,
   type UTCTimestamp,
   type IPriceLine,
+  type ISeriesMarkersPluginApi,
 } from "lightweight-charts";
 import { Bar } from "@/lib/types";
 import { Order, Position, ClosedTrade } from "@/lib/backtestTypes";
@@ -87,9 +89,85 @@ export default function ReplayChart({
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
   const savedLogicalRange = useRef<{ from: number; to: number } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const markersPluginRef = useRef<ISeriesMarkersPluginApi<any> | null>(null);
+
+  // Pattern Library state
+  const [patternMenuOpen, setPatternMenuOpen] = useState(false);
+  const [activePatterns, setActivePatterns] = useState<Set<string>>(new Set());
+
+  const togglePattern = useCallback((pattern: string) => {
+    setActivePatterns((prev) => {
+      const next = new Set(prev);
+      if (next.has(pattern)) next.delete(pattern);
+      else next.add(pattern);
+      return next;
+    });
+  }, []);
 
   const revealedBars = bars.slice(0, revealedCount);
   const currentPrice = revealedBars.length > 0 ? revealedBars[revealedBars.length - 1].close : 0;
+
+  // Pattern detection
+  const patternMarkers = useMemo(() => {
+    if (activePatterns.size === 0 || revealedBars.length < 2) return [];
+    const markers: { time: number; position: "aboveBar" | "belowBar"; shape: "circle" | "square" | "arrowUp" | "arrowDown"; color: string; text: string; size: number }[] = [];
+
+    for (let i = 1; i < revealedBars.length; i++) {
+      const curr = revealedBars[i];
+      const prev = revealedBars[i - 1];
+
+      // Inside Bar: current bar's high/low is within previous bar's range
+      if (activePatterns.has("insideBar")) {
+        if (curr.high <= prev.high && curr.low >= prev.low) {
+          markers.push({ time: curr.time, position: "aboveBar", shape: "circle", color: "#58a6ff", text: "IB", size: 0.5 });
+        }
+      }
+
+      // Outside Bar: current bar engulfs previous bar
+      if (activePatterns.has("outsideBar")) {
+        if (curr.high > prev.high && curr.low < prev.low) {
+          markers.push({ time: curr.time, position: "aboveBar", shape: "square", color: "#d2a8ff", text: "OB", size: 0.5 });
+        }
+      }
+    }
+
+    // Opening Range Breakout: mark bar that breaks the high/low of the first 3 bars
+    if (activePatterns.has("orbBreakout") && revealedBars.length >= 3) {
+      const orbHigh = Math.max(revealedBars[0].high, revealedBars[1].high, revealedBars[2].high);
+      const orbLow = Math.min(revealedBars[0].low, revealedBars[1].low, revealedBars[2].low);
+      let breakoutFound = false;
+      for (let i = 3; i < revealedBars.length && !breakoutFound; i++) {
+        if (revealedBars[i].close > orbHigh) {
+          markers.push({ time: revealedBars[i].time, position: "belowBar", shape: "arrowUp", color: "#3fb950", text: "ORB↑", size: 0.5 });
+          breakoutFound = true;
+        } else if (revealedBars[i].close < orbLow) {
+          markers.push({ time: revealedBars[i].time, position: "aboveBar", shape: "arrowDown", color: "#f85149", text: "ORB↓", size: 0.5 });
+          breakoutFound = true;
+        }
+      }
+    }
+
+    // Sort by time (required by lightweight-charts)
+    markers.sort((a, b) => a.time - b.time);
+    return markers;
+  }, [revealedBars, activePatterns]);
+
+  // Apply pattern markers to chart
+  useEffect(() => {
+    const plugin = markersPluginRef.current;
+    if (!plugin) return;
+    plugin.setMarkers(
+      patternMarkers.map((m) => ({
+        time: m.time as UTCTimestamp,
+        position: m.position,
+        shape: m.shape,
+        color: m.color,
+        text: m.text,
+        size: m.size,
+      }))
+    );
+  }, [patternMarkers]);
 
   // Compute unified SL/TP: if all positions share the same SL or TP, show as unified
   const unifiedSL = positions.length > 0 && positions.every((p) => p.stopLoss != null && p.stopLoss === positions[0].stopLoss)
@@ -144,6 +222,7 @@ export default function ReplayChart({
       wickDownColor: "#f8514980",
     });
     seriesRef.current = series;
+    markersPluginRef.current = createSeriesMarkers(series, []);
 
     // Track crosshair price for order placement
     chart.subscribeCrosshairMove((param) => {
@@ -173,6 +252,7 @@ export default function ReplayChart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      markersPluginRef.current = null;
       timeRangeSetRef.current = false;
     };
   }, []);
@@ -559,6 +639,7 @@ export default function ReplayChart({
   // Handle shift+click for quick order
   const handleClick = useCallback((e: React.MouseEvent) => {
     setContextMenu(null);
+    setPatternMenuOpen(false);
 
     if (!e.shiftKey) return;
     const chart = chartRef.current;
@@ -770,6 +851,57 @@ export default function ReplayChart({
         onMouseLeave={handleMouseUp}
         style={{ cursor: dragging ? "ns-resize" : "crosshair" }}
       />
+
+      {/* Pattern Library — top-left dropdown */}
+      <div className="absolute top-2 left-2 z-40">
+        <button
+          onClick={() => setPatternMenuOpen((v) => !v)}
+          className="text-[9px] font-mono px-2 py-1 rounded transition-colors"
+          style={{
+            background: activePatterns.size > 0 ? "rgba(88, 166, 255, 0.12)" : "rgba(12, 15, 21, 0.7)",
+            backdropFilter: "blur(12px)",
+            border: `1px solid ${activePatterns.size > 0 ? "rgba(88, 166, 255, 0.3)" : "rgba(255,255,255,0.06)"}`,
+            color: activePatterns.size > 0 ? "#58a6ff" : "#7d8590",
+          }}
+        >
+          Patterns{activePatterns.size > 0 ? ` (${activePatterns.size})` : ""}
+        </button>
+        {patternMenuOpen && (
+          <div
+            className="absolute top-full left-0 mt-1 rounded-md py-1 min-w-[180px]"
+            style={{
+              background: "rgba(12, 15, 21, 0.94)",
+              backdropFilter: "blur(12px)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+            }}
+          >
+            {([
+              { id: "insideBar", label: "Inside Bar", color: "#58a6ff" },
+              { id: "outsideBar", label: "Outside Bar", color: "#d2a8ff" },
+              { id: "orbBreakout", label: "ORB (First 3 Bars)", color: "#3fb950" },
+            ] as const).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => togglePattern(p.id)}
+                className="flex items-center gap-2 w-full px-3 py-1.5 text-[10px] font-mono transition-colors hover:bg-white/5"
+                style={{ color: activePatterns.has(p.id) ? p.color : "#7d8590" }}
+              >
+                <span
+                  className="w-3 h-3 rounded-[3px] border flex items-center justify-center text-[8px]"
+                  style={{
+                    borderColor: activePatterns.has(p.id) ? p.color : "rgba(255,255,255,0.15)",
+                    background: activePatterns.has(p.id) ? `${p.color}20` : "transparent",
+                  }}
+                >
+                  {activePatterns.has(p.id) ? "✓" : ""}
+                </span>
+                {p.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Position PnL labels — large, aesthetic blocks pinned to left edge */}
       {posLabels.map((pl) => {
