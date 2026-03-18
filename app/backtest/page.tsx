@@ -47,6 +47,9 @@ export default function BacktestPage() {
   // Cumulative session stats (persists across days)
   const [sessionTrades, setSessionTrades] = useState<ClosedTrade[]>([]);
 
+  // Trading size (points per unit)
+  const [tradingSize, setTradingSize] = useState(1);
+
   // Pool filter
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
   const [showFilter, setShowFilter] = useState(false);
@@ -87,6 +90,24 @@ export default function BacktestPage() {
     const matching = findMatchingDays(allDays, currentDay);
     return computeSignatureStats(matching);
   }, [currentDay, allDays]);
+
+  // Compute previous day ATR (true range = max(H-L, |H-prevC|, |L-prevC|))
+  const prevDayATR = useMemo(() => {
+    if (!currentDay) return null;
+    const { prevDayHigh, prevDayLow, prevClose } = currentDay;
+    if (prevDayHigh == null || prevDayLow == null) return null;
+    // Simple: use previous day's range (high - low)
+    // For true ATR we'd need prevClose of the day before prev, so use range
+    const range = prevDayHigh - prevDayLow;
+    if (prevClose != null) {
+      // True Range = max(H-L, |H-prevC|, |L-prevC|)
+      // But here prevClose IS the previous day's close, and prevDayHigh/Low are prev day's H/L
+      // So true range of the previous day = max(prevDayH - prevDayL, ...)
+      // prevClose of the day before the previous day isn't available, so just use range
+      return range;
+    }
+    return range;
+  }, [currentDay]);
 
   // Pick a new random day
   const newRandomDay = useCallback(() => {
@@ -167,7 +188,6 @@ export default function BacktestPage() {
         let exitPrice = barClose;
         let exitReason: ClosedTrade["exitReason"] = "eod";
 
-        // Check stop loss
         if (pos.stopLoss != null) {
           if (pos.direction === "long" && barLow <= pos.stopLoss) {
             closed = true;
@@ -180,7 +200,6 @@ export default function BacktestPage() {
           }
         }
 
-        // Check take profit (if not already stopped)
         if (!closed && pos.takeProfit != null) {
           if (pos.direction === "long" && barHigh >= pos.takeProfit) {
             closed = true;
@@ -203,7 +222,7 @@ export default function BacktestPage() {
             entryTime: pos.entryTime,
             exitPrice,
             exitTime: barTime,
-            pnlPoints,
+            pnlPoints: pnlPoints * tradingSize,
             pnlPercent: (pnlPoints / pos.entryPrice) * 100,
             exitReason,
           });
@@ -224,7 +243,6 @@ export default function BacktestPage() {
 
     // Check if day is complete
     if (newCount >= totalBars) {
-      // Close all remaining positions at EOD
       setPositions((prev) => {
         if (prev.length === 0) return prev;
         const eodTrades: ClosedTrade[] = prev.map((pos) => {
@@ -237,7 +255,7 @@ export default function BacktestPage() {
             entryTime: pos.entryTime,
             exitPrice: barClose,
             exitTime: barTime,
-            pnlPoints,
+            pnlPoints: pnlPoints * tradingSize,
             pnlPercent: (pnlPoints / pos.entryPrice) * 100,
             exitReason: "eod" as const,
           };
@@ -247,11 +265,10 @@ export default function BacktestPage() {
         return [];
       });
 
-      // Cancel pending orders
       setOrders((prev) => prev.map((o) => o.status === "pending" ? { ...o, status: "cancelled" as const } : o));
       setDayComplete(true);
     }
-  }, [currentDay, revealedBarCount, dayComplete]);
+  }, [currentDay, revealedBarCount, dayComplete, tradingSize]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -263,13 +280,11 @@ export default function BacktestPage() {
         e.preventDefault();
         advanceBar();
       } else if (e.key === "m" || e.key === "M") {
-        // Market buy
         if (currentDay && !dayComplete) {
           const price = currentDay.bars[revealedBarCount - 1]?.close;
           if (price) handlePlaceOrder(price, "long", "market");
         }
       } else if (e.key === "n" || e.key === "N") {
-        // Market sell
         if (currentDay && !dayComplete) {
           const price = currentDay.bars[revealedBarCount - 1]?.close;
           if (price) handlePlaceOrder(price, "short", "market");
@@ -295,7 +310,6 @@ export default function BacktestPage() {
     };
 
     if (type === "market") {
-      // Immediately fill at current bar close
       const currentBar = currentDay.bars[revealedBarCount - 1];
       order.status = "filled";
       order.filledAt = currentBar.time;
@@ -339,7 +353,7 @@ export default function BacktestPage() {
         entryTime: pos.entryTime,
         exitPrice: currentBar.close,
         exitTime: currentBar.time,
-        pnlPoints,
+        pnlPoints: pnlPoints * tradingSize,
         pnlPercent: (pnlPoints / pos.entryPrice) * 100,
         exitReason: "manual",
       };
@@ -348,7 +362,7 @@ export default function BacktestPage() {
       setSessionTrades((st) => [...st, trade]);
       return prev.filter((p) => p.id !== id);
     });
-  }, [currentDay, revealedBarCount]);
+  }, [currentDay, revealedBarCount, tradingSize]);
 
   const handleUpdatePositionSL = useCallback((id: string, sl: number | null) => {
     setPositions((prev) => prev.map((p) => p.id === id ? { ...p, stopLoss: sl } : p));
@@ -356,6 +370,15 @@ export default function BacktestPage() {
 
   const handleUpdatePositionTP = useCallback((id: string, tp: number | null) => {
     setPositions((prev) => prev.map((p) => p.id === id ? { ...p, takeProfit: tp } : p));
+  }, []);
+
+  // Unified SL/TP update for all positions
+  const handleUpdateAllSL = useCallback((sl: number | null) => {
+    setPositions((prev) => prev.map((p) => ({ ...p, stopLoss: sl })));
+  }, []);
+
+  const handleUpdateAllTP = useCallback((tp: number | null) => {
+    setPositions((prev) => prev.map((p) => ({ ...p, takeProfit: tp })));
   }, []);
 
   const handleUpdateOrderPrice = useCallback((id: string, price: number) => {
@@ -475,9 +498,14 @@ export default function BacktestPage() {
               onPlaceOrder={handlePlaceOrder}
               onUpdatePositionSL={handleUpdatePositionSL}
               onUpdatePositionTP={handleUpdatePositionTP}
+              onUpdateAllSL={handleUpdateAllSL}
+              onUpdateAllTP={handleUpdateAllTP}
               onUpdateOrderPrice={handleUpdateOrderPrice}
               onUpdateOrderSL={handleUpdateOrderSL}
               onUpdateOrderTP={handleUpdateOrderTP}
+              prevDayATR={prevDayATR}
+              tradingSize={tradingSize}
+              onTradingSizeChange={setTradingSize}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -493,9 +521,9 @@ export default function BacktestPage() {
             </div>
           )}
 
-          {/* Action buttons — bottom-right of chart */}
+          {/* Action buttons — bottom-left of chart, away from price axis */}
           {currentDay && !dayComplete && (
-            <div className="absolute bottom-3 right-3 z-40 flex items-center gap-1.5">
+            <div className="absolute bottom-3 left-3 z-40 flex items-center gap-1.5">
               <button
                 onClick={() => {
                   const price = currentDay.bars[revealedBarCount - 1]?.close;
@@ -579,6 +607,8 @@ export default function BacktestPage() {
                 onClosePosition={handleClosePosition}
                 onUpdatePositionSL={handleUpdatePositionSL}
                 onUpdatePositionTP={handleUpdatePositionTP}
+                onUpdateAllSL={handleUpdateAllSL}
+                onUpdateAllTP={handleUpdateAllTP}
               />
             </div>
           </div>

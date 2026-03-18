@@ -13,6 +13,8 @@ interface Props {
   onClosePosition: (id: string) => void;
   onUpdatePositionSL: (id: string, sl: number | null) => void;
   onUpdatePositionTP: (id: string, tp: number | null) => void;
+  onUpdateAllSL: (sl: number | null) => void;
+  onUpdateAllTP: (tp: number | null) => void;
 }
 
 export default function OrderPanel({
@@ -25,6 +27,8 @@ export default function OrderPanel({
   onClosePosition,
   onUpdatePositionSL,
   onUpdatePositionTP,
+  onUpdateAllSL,
+  onUpdateAllTP,
 }: Props) {
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const currentPrice = currentBar?.close ?? 0;
@@ -32,13 +36,34 @@ export default function OrderPanel({
   // Session summary (all trades across all days)
   const totalPnl = sessionTrades.reduce((sum, t) => sum + t.pnlPoints, 0);
   const winners = sessionTrades.filter((t) => t.pnlPoints > 0).length;
+  const losers = sessionTrades.filter((t) => t.pnlPoints < 0).length;
   const winRate = sessionTrades.length > 0 ? (winners / sessionTrades.length) * 100 : 0;
+
+  // Avg win / avg loss
+  const avgWin = winners > 0
+    ? sessionTrades.filter((t) => t.pnlPoints > 0).reduce((s, t) => s + t.pnlPoints, 0) / winners
+    : 0;
+  const avgLoss = losers > 0
+    ? sessionTrades.filter((t) => t.pnlPoints < 0).reduce((s, t) => s + t.pnlPoints, 0) / losers
+    : 0;
 
   // Unrealized P&L
   const unrealizedPnl = positions.reduce((sum, p) => {
     const mult = p.direction === "long" ? 1 : -1;
     return sum + (currentPrice - p.entryPrice) * mult;
   }, 0);
+
+  // Equity curve data points (cumulative PnL after each trade)
+  const equityCurve: number[] = [];
+  let cumPnl = 0;
+  for (const t of sessionTrades) {
+    cumPnl += t.pnlPoints;
+    equityCurve.push(cumPnl);
+  }
+
+  // Check if all positions have same SL/TP (for unified button state)
+  const allHaveSL = positions.length > 0 && positions.every((p) => p.stopLoss != null);
+  const allHaveTP = positions.length > 0 && positions.every((p) => p.takeProfit != null);
 
   return (
     <div className="space-y-3 text-[11px]">
@@ -51,7 +76,7 @@ export default function OrderPanel({
         <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
           <div className="text-[9px] text-[var(--text-dim)]">Win Rate</div>
           <div className="font-semibold" style={{ color: winRate >= 50 ? "var(--green)" : "var(--red)" }}>
-            {closedTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
+            {sessionTrades.length > 0 ? `${winRate.toFixed(0)}%` : "—"}
           </div>
         </div>
         <div className="flex-1 text-center p-1.5 rounded-lg" style={{ background: "var(--surface)" }}>
@@ -62,10 +87,83 @@ export default function OrderPanel({
         </div>
       </div>
 
+      {/* Avg Win / Avg Loss */}
+      {sessionTrades.length > 0 && (
+        <div className="flex gap-3">
+          <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
+            <div className="text-[8px] text-[var(--text-dim)]">Avg Win</div>
+            <div className="text-[10px] font-mono" style={{ color: "var(--green)" }}>
+              {winners > 0 ? `+${avgWin.toFixed(1)}` : "—"}
+            </div>
+          </div>
+          <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
+            <div className="text-[8px] text-[var(--text-dim)]">Avg Loss</div>
+            <div className="text-[10px] font-mono" style={{ color: "var(--red)" }}>
+              {losers > 0 ? avgLoss.toFixed(1) : "—"}
+            </div>
+          </div>
+          <div className="flex-1 text-center p-1 rounded-lg" style={{ background: "var(--surface)" }}>
+            <div className="text-[8px] text-[var(--text-dim)]">R:R</div>
+            <div className="text-[10px] font-mono text-[var(--text)]">
+              {winners > 0 && losers > 0 ? (avgWin / Math.abs(avgLoss)).toFixed(2) : "—"}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Equity Curve */}
+      {equityCurve.length >= 2 && (
+        <div>
+          <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1">Equity Curve</h3>
+          <EquityCurve data={equityCurve} />
+        </div>
+      )}
+
       {/* Open Positions */}
       {positions.length > 0 && (
         <div>
-          <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)] mb-1.5">Open Positions</h3>
+          <div className="flex items-center justify-between mb-1.5">
+            <h3 className="text-[9px] font-semibold uppercase tracking-widest text-[var(--text-dim)]">Open Positions</h3>
+            {positions.length > 1 && (
+              <div className="flex gap-1">
+                <button
+                  onClick={() => {
+                    if (allHaveSL) {
+                      onUpdateAllSL(null);
+                    } else {
+                      // Average entry, set SL 20pts away
+                      const avgEntry = positions.reduce((s, p) => s + p.entryPrice, 0) / positions.length;
+                      const isLong = positions[0].direction === "long";
+                      onUpdateAllSL(Math.round((isLong ? avgEntry - 20 : avgEntry + 20) * 10) / 10);
+                    }
+                  }}
+                  className="text-[7px] px-1 py-0.5 rounded transition-colors"
+                  style={{
+                    color: allHaveSL ? "#0d1117" : "var(--red)",
+                    background: allHaveSL ? "var(--red)" : "transparent",
+                    border: "1px solid var(--red)",
+                  }}
+                >ALL SL</button>
+                <button
+                  onClick={() => {
+                    if (allHaveTP) {
+                      onUpdateAllTP(null);
+                    } else {
+                      const avgEntry = positions.reduce((s, p) => s + p.entryPrice, 0) / positions.length;
+                      const isLong = positions[0].direction === "long";
+                      onUpdateAllTP(Math.round((isLong ? avgEntry + 20 : avgEntry - 20) * 10) / 10);
+                    }
+                  }}
+                  className="text-[7px] px-1 py-0.5 rounded transition-colors"
+                  style={{
+                    color: allHaveTP ? "#0d1117" : "var(--green)",
+                    background: allHaveTP ? "var(--green)" : "transparent",
+                    border: "1px solid var(--green)",
+                  }}
+                >ALL TP</button>
+              </div>
+            )}
+          </div>
           <div className="space-y-1">
             {positions.map((p) => {
               const mult = p.direction === "long" ? 1 : -1;
@@ -83,10 +181,8 @@ export default function OrderPanel({
                     <button
                       onClick={() => {
                         if (p.stopLoss != null) {
-                          // Toggle off
                           onUpdatePositionSL(p.id, null);
                         } else {
-                          // Set 20 pts away from entry (user can drag to adjust)
                           const sl = p.direction === "long"
                             ? p.entryPrice - 20
                             : p.entryPrice + 20;
@@ -103,10 +199,8 @@ export default function OrderPanel({
                     <button
                       onClick={() => {
                         if (p.takeProfit != null) {
-                          // Toggle off
                           onUpdatePositionTP(p.id, null);
                         } else {
-                          // Set 20 pts away from entry (user can drag to adjust)
                           const tp = p.direction === "long"
                             ? p.entryPrice + 20
                             : p.entryPrice - 20;
@@ -190,5 +284,50 @@ export default function OrderPanel({
         </div>
       )}
     </div>
+  );
+}
+
+function EquityCurve({ data }: { data: number[] }) {
+  if (data.length < 2) return null;
+
+  const w = 260;
+  const h = 50;
+  const pad = 2;
+
+  const min = Math.min(0, ...data);
+  const max = Math.max(0, ...data);
+  const range = max - min || 1;
+
+  const points = data.map((v, i) => {
+    const x = pad + (i / (data.length - 1)) * (w - 2 * pad);
+    const y = pad + (1 - (v - min) / range) * (h - 2 * pad);
+    return `${x},${y}`;
+  }).join(" ");
+
+  // Zero line y position
+  const zeroY = pad + (1 - (0 - min) / range) * (h - 2 * pad);
+
+  const lastValue = data[data.length - 1];
+  const color = lastValue >= 0 ? "#3fb950" : "#f85149";
+
+  return (
+    <svg width={w} height={h} className="w-full" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      {/* Zero line */}
+      <line x1={pad} y1={zeroY} x2={w - pad} y2={zeroY} stroke="#21262d" strokeWidth="1" strokeDasharray="3,3" />
+      {/* Equity line */}
+      <polyline
+        points={points}
+        fill="none"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      {/* Fill below line */}
+      <polyline
+        points={`${pad},${zeroY} ${points} ${pad + ((data.length - 1) / (data.length - 1)) * (w - 2 * pad)},${zeroY}`}
+        fill={`${color}15`}
+        stroke="none"
+      />
+    </svg>
   );
 }

@@ -33,9 +33,14 @@ interface Props {
   onPlaceOrder: (price: number, direction: "long" | "short", type: "limit" | "stop" | "market") => void;
   onUpdatePositionSL: (id: string, sl: number | null) => void;
   onUpdatePositionTP: (id: string, tp: number | null) => void;
+  onUpdateAllSL: (sl: number | null) => void;
+  onUpdateAllTP: (tp: number | null) => void;
   onUpdateOrderPrice: (id: string, price: number) => void;
   onUpdateOrderSL: (id: string, sl: number | null) => void;
   onUpdateOrderTP: (id: string, tp: number | null) => void;
+  prevDayATR: number | null;
+  tradingSize: number;
+  onTradingSizeChange: (size: number) => void;
 }
 
 export default function ReplayChart({
@@ -48,9 +53,14 @@ export default function ReplayChart({
   onPlaceOrder,
   onUpdatePositionSL,
   onUpdatePositionTP,
+  onUpdateAllSL,
+  onUpdateAllTP,
   onUpdateOrderPrice,
   onUpdateOrderSL,
   onUpdateOrderTP,
+  prevDayATR,
+  tradingSize,
+  onTradingSizeChange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -58,15 +68,23 @@ export default function ReplayChart({
   const priceLinesRef = useRef<Map<string, IPriceLine>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; price: number } | null>(null);
   const [dragging, setDragging] = useState<DragLine | null>(null);
   const lastCrosshairPrice = useRef<number>(0);
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
+  const savedLogicalRange = useRef<{ from: number; to: number } | null>(null);
 
   const revealedBars = bars.slice(0, revealedCount);
   const currentPrice = revealedBars.length > 0 ? revealedBars[revealedBars.length - 1].close : 0;
+
+  // Compute unified SL/TP: if all positions share the same SL or TP, show as unified
+  const unifiedSL = positions.length > 0 && positions.every((p) => p.stopLoss != null && p.stopLoss === positions[0].stopLoss)
+    ? positions[0].stopLoss
+    : null;
+  const unifiedTP = positions.length > 0 && positions.every((p) => p.takeProfit != null && p.takeProfit === positions[0].takeProfit)
+    ? positions[0].takeProfit
+    : null;
 
   // Initialize chart
   useEffect(() => {
@@ -98,6 +116,8 @@ export default function ReplayChart({
         vertLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
         horzLine: { color: "#58a6ff", width: 1, style: 2, labelBackgroundColor: "#1f6feb" },
       },
+      handleScroll: true,
+      handleScale: true,
     });
 
     chartRef.current = chart;
@@ -199,7 +219,6 @@ export default function ReplayChart({
 
     // Order lines
     orders.filter((o) => o.status === "pending").forEach((o) => {
-      // Entry
       const entryPl = series.createPriceLine({
         price: o.price,
         color: "#58a6ff",
@@ -241,7 +260,12 @@ export default function ReplayChart({
       }
     });
 
-    // Position lines
+    // Position lines — unified SL/TP when multiple positions share the same value
+    const slValues = new Set(positions.filter((p) => p.stopLoss != null).map((p) => p.stopLoss));
+    const tpValues = new Set(positions.filter((p) => p.takeProfit != null).map((p) => p.takeProfit));
+    const hasUnifiedSL = slValues.size === 1 && positions.length > 1 && positions.every((p) => p.stopLoss != null);
+    const hasUnifiedTP = tpValues.size === 1 && positions.length > 1 && positions.every((p) => p.takeProfit != null);
+
     positions.forEach((p) => {
       // Entry
       const entryPl = series.createPriceLine({
@@ -256,7 +280,8 @@ export default function ReplayChart({
       });
       priceLinesRef.current.set(`pos-entry-${p.id}`, entryPl);
 
-      if (p.stopLoss != null) {
+      // Only show individual SL/TP if not unified
+      if (p.stopLoss != null && !hasUnifiedSL) {
         const slPl = series.createPriceLine({
           price: p.stopLoss,
           color: "#f85149",
@@ -270,7 +295,7 @@ export default function ReplayChart({
         priceLinesRef.current.set(`pos-sl-${p.id}`, slPl);
       }
 
-      if (p.takeProfit != null) {
+      if (p.takeProfit != null && !hasUnifiedTP) {
         const tpPl = series.createPriceLine({
           price: p.takeProfit,
           color: "#3fb950",
@@ -285,13 +310,40 @@ export default function ReplayChart({
       }
     });
 
+    // Unified SL/TP lines (single line for all positions)
+    if (hasUnifiedSL && unifiedSL != null) {
+      const slPl = series.createPriceLine({
+        price: unifiedSL,
+        color: "#f85149",
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: `SL (${positions.length})`,
+        axisLabelColor: "#f85149",
+        axisLabelTextColor: "#0d1117",
+      });
+      priceLinesRef.current.set("unified-sl", slPl);
+    }
+    if (hasUnifiedTP && unifiedTP != null) {
+      const tpPl = series.createPriceLine({
+        price: unifiedTP,
+        color: "#3fb950",
+        lineWidth: 2,
+        lineStyle: 0,
+        axisLabelVisible: true,
+        title: `TP (${positions.length})`,
+        axisLabelColor: "#3fb950",
+        axisLabelTextColor: "#0d1117",
+      });
+      priceLinesRef.current.set("unified-tp", tpPl);
+    }
+
     // Closed trade markers — only show trades whose times fall within current day's bar range
     const markers: SeriesMarker<UTCTimestamp>[] = [];
     if (closedTrades.length > 0 && revealedBars.length > 0) {
       const dayStart = bars[0].time;
       const dayEnd = bars[bars.length - 1].time;
       for (const t of closedTrades) {
-        // Skip trades from other days
         if (t.entryTime < dayStart || t.entryTime > dayEnd) continue;
         const entryIdx = findClosestBarIndex(revealedBars, t.entryTime);
         const exitIdx = findClosestBarIndex(revealedBars, t.exitTime);
@@ -315,7 +367,6 @@ export default function ReplayChart({
       }
       markers.sort((a, b) => (a.time as number) - (b.time as number));
     }
-    // Update markers (setMarkers replaces all existing markers)
     if (markersRef.current) {
       markersRef.current.setMarkers(markers);
     }
@@ -328,11 +379,12 @@ export default function ReplayChart({
         chart.timeScale().setVisibleLogicalRange({ from: -1, to: bars.length });
         timeRangeSetRef.current = true;
         prevFirstBarTime.current = firstBarTime;
+        savedLogicalRange.current = null;
       } else {
         chart.timeScale().fitContent();
       }
     }
-  }, [revealedBars, prevClose, orders, positions, closedTrades, bars]);
+  }, [revealedBars, prevClose, orders, positions, closedTrades, bars, unifiedSL, unifiedTP]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -377,17 +429,41 @@ export default function ReplayChart({
     const clickPrice = series.coordinateToPrice(y);
     if (clickPrice === null) return;
 
-    // Check if click is near any SL/TP line (within 0.05% of asset value)
     const threshold = currentPrice * 0.001;
+
+    // Check unified SL/TP first
+    if (unifiedSL != null && Math.abs((clickPrice as number) - unifiedSL) < threshold) {
+      // Save current view range before disabling interaction
+      const lr = chart.timeScale().getVisibleLogicalRange();
+      if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+      chart.applyOptions({ handleScroll: false, handleScale: false });
+      setDragging({ id: "unified", type: "sl", price: unifiedSL });
+      e.preventDefault();
+      return;
+    }
+    if (unifiedTP != null && Math.abs((clickPrice as number) - unifiedTP) < threshold) {
+      const lr = chart.timeScale().getVisibleLogicalRange();
+      if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+      chart.applyOptions({ handleScroll: false, handleScale: false });
+      setDragging({ id: "unified", type: "tp", price: unifiedTP });
+      e.preventDefault();
+      return;
+    }
 
     // Check position SL/TP lines
     for (const p of positions) {
       if (p.stopLoss != null && Math.abs((clickPrice as number) - p.stopLoss) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
         setDragging({ id: p.id, type: "sl", positionId: p.id, price: p.stopLoss });
         e.preventDefault();
         return;
       }
       if (p.takeProfit != null && Math.abs((clickPrice as number) - p.takeProfit) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
         setDragging({ id: p.id, type: "tp", positionId: p.id, price: p.takeProfit });
         e.preventDefault();
         return;
@@ -397,28 +473,38 @@ export default function ReplayChart({
     // Check order lines
     for (const o of orders.filter((o) => o.status === "pending")) {
       if (o.stopLoss != null && Math.abs((clickPrice as number) - o.stopLoss) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
         setDragging({ id: o.id, type: "sl", orderId: o.id, price: o.stopLoss });
         e.preventDefault();
         return;
       }
       if (o.takeProfit != null && Math.abs((clickPrice as number) - o.takeProfit) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
         setDragging({ id: o.id, type: "tp", orderId: o.id, price: o.takeProfit });
         e.preventDefault();
         return;
       }
       if (Math.abs((clickPrice as number) - o.price) < threshold) {
+        const lr = chart.timeScale().getVisibleLogicalRange();
+        if (lr) savedLogicalRange.current = { from: lr.from, to: lr.to };
+        chart.applyOptions({ handleScroll: false, handleScale: false });
         setDragging({ id: o.id, type: "entry", orderId: o.id, price: o.price });
         e.preventDefault();
         return;
       }
     }
-  }, [positions, orders, currentPrice]);
+  }, [positions, orders, currentPrice, unifiedSL, unifiedTP]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     if (!dragging) return;
     const series = seriesRef.current;
     if (!series || !containerRef.current) return;
 
+    e.preventDefault();
     const rect = containerRef.current.getBoundingClientRect();
     const y = e.clientY - rect.top;
     const price = series.coordinateToPrice(y);
@@ -426,7 +512,11 @@ export default function ReplayChart({
 
     const newPrice = Math.round((price as number) * 10) / 10;
 
-    if (dragging.positionId) {
+    // Unified drag — update all positions at once
+    if (dragging.id === "unified") {
+      if (dragging.type === "sl") onUpdateAllSL(newPrice);
+      else if (dragging.type === "tp") onUpdateAllTP(newPrice);
+    } else if (dragging.positionId) {
       if (dragging.type === "sl") onUpdatePositionSL(dragging.positionId, newPrice);
       else if (dragging.type === "tp") onUpdatePositionTP(dragging.positionId, newPrice);
     } else if (dragging.orderId) {
@@ -434,11 +524,22 @@ export default function ReplayChart({
       else if (dragging.type === "tp") onUpdateOrderTP(dragging.orderId, newPrice);
       else if (dragging.type === "entry") onUpdateOrderPrice(dragging.orderId, newPrice);
     }
-  }, [dragging, onUpdatePositionSL, onUpdatePositionTP, onUpdateOrderSL, onUpdateOrderTP, onUpdateOrderPrice]);
+  }, [dragging, onUpdatePositionSL, onUpdatePositionTP, onUpdateAllSL, onUpdateAllTP, onUpdateOrderSL, onUpdateOrderTP, onUpdateOrderPrice]);
 
   const handleMouseUp = useCallback(() => {
+    if (dragging) {
+      const chart = chartRef.current;
+      if (chart) {
+        chart.applyOptions({ handleScroll: true, handleScale: true });
+        // Restore the view range that was saved before dragging
+        if (savedLogicalRange.current) {
+          chart.timeScale().setVisibleLogicalRange(savedLogicalRange.current);
+          savedLogicalRange.current = null;
+        }
+      }
+    }
     setDragging(null);
-  }, []);
+  }, [dragging]);
 
   // Order placement from context menu
   const placeFromMenu = useCallback((direction: "long" | "short", type: "limit" | "stop") => {
@@ -447,6 +548,8 @@ export default function ReplayChart({
       setContextMenu(null);
     }
   }, [contextMenu, onPlaceOrder]);
+
+  const SIZES = [1, 2, 5, 10];
 
   return (
     <div className="relative h-full w-full flex flex-col">
@@ -461,6 +564,31 @@ export default function ReplayChart({
         onMouseLeave={handleMouseUp}
         style={{ cursor: dragging ? "ns-resize" : "crosshair" }}
       />
+
+      {/* Top-right overlay: Trading Size + ATR */}
+      <div className="absolute top-2 right-16 z-40 flex items-center gap-2">
+        {prevDayATR != null && (
+          <div className="text-[9px] font-mono px-2 py-1 rounded"
+            style={{ background: "#161b22", border: "1px solid #21262d", color: "#7d8590" }}>
+            ATR <span className="text-[var(--text)]">{prevDayATR.toFixed(1)}</span>
+          </div>
+        )}
+        <div className="flex items-center gap-0.5 px-1 py-0.5 rounded"
+          style={{ background: "#161b22", border: "1px solid #21262d" }}>
+          <span className="text-[8px] text-[#7d8590] mr-1">Size</span>
+          {SIZES.map((s) => (
+            <button
+              key={s}
+              onClick={() => onTradingSizeChange(s)}
+              className="text-[9px] font-mono px-1.5 py-0.5 rounded transition-colors"
+              style={{
+                background: tradingSize === s ? "#58a6ff" : "transparent",
+                color: tradingSize === s ? "#0d1117" : "#7d8590",
+              }}
+            >{s}</button>
+          ))}
+        </div>
+      </div>
 
       {/* Context Menu */}
       {contextMenu && (
@@ -495,7 +623,7 @@ export default function ReplayChart({
             color: dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : "var(--accent)",
             border: `1px solid ${dragging.type === "sl" ? "var(--red)" : dragging.type === "tp" ? "var(--green)" : "var(--accent)"}40`,
           }}>
-          Dragging {dragging.type.toUpperCase()}
+          Dragging {dragging.type.toUpperCase()}{dragging.id === "unified" ? " (all)" : ""}
         </div>
       )}
     </div>
