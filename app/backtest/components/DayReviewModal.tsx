@@ -223,14 +223,14 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
     : 0;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(16px) saturate(0.8)" }}>
+    <div className="fixed inset-y-0 right-0 z-[100] slide-in-right" style={{ width: "420px" }}>
       <div
-        className="w-[90vw] max-w-[700px] max-h-[85vh] flex flex-col rounded-xl overflow-hidden float-in"
+        className="w-full h-full flex flex-col overflow-hidden"
         style={{
-          background: "linear-gradient(160deg, rgba(12, 15, 21, 0.92), rgba(18, 22, 30, 0.85))",
+          background: "linear-gradient(160deg, rgba(12, 15, 21, 0.98), rgba(18, 22, 30, 0.95))",
           backdropFilter: "blur(32px) saturate(1.4)",
-          border: "1px solid rgba(255, 255, 255, 0.08)",
-          boxShadow: "0 8px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)",
+          borderLeft: "1px solid rgba(255, 255, 255, 0.08)",
+          boxShadow: "-8px 0 64px rgba(0,0,0,0.6)",
         }}
       >
         {/* Header */}
