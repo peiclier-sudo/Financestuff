@@ -416,7 +416,7 @@ export default function ReplayChart({
       const mult = p.direction === "long" ? 1 : -1;
       const pnlPts = (currentPrice - p.entryPrice) * mult;
       const pnl = pnlPts * tradingSize;
-      const pnlColor = pnlPts >= 0 ? "#3fb95090" : "#f8514990";
+      const pnlColor = pnlPts >= 0 ? "#3fb95040" : "#f8514940";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
@@ -441,7 +441,7 @@ export default function ReplayChart({
       if (p.stopLoss != null && !hasUnifiedSL) {
         const slPl = series.createPriceLine({
           price: p.stopLoss,
-          color: "#f8514960",
+          color: "#f85149cc",
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
@@ -472,7 +472,7 @@ export default function ReplayChart({
     if (hasUnifiedSL && unifiedSL != null) {
       const slPl = series.createPriceLine({
         price: unifiedSL,
-        color: "#f8514980",
+        color: "#f85149dd",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
@@ -934,8 +934,8 @@ export default function ReplayChart({
               { id: "outsideBar", label: "Outside Bar", color: "#d2a8ff" },
               { id: "pinBar", label: "Pin Bar", color: "#79c0ff" },
               { id: "umbrella", label: "Umbrella", color: "#e3b341" },
-              { id: "boc", label: "BOC (Buy Outside Candle)", color: "#3fb950" },
-              { id: "soc", label: "SOC (Sell Outside Candle)", color: "#f85149" },
+              { id: "boc", label: "BOC (Buy On Close)", color: "#3fb950" },
+              { id: "soc", label: "SOC (Sell On Close)", color: "#f85149" },
               { id: "orbBreakout", label: "ORB (First 3 Bars)", color: "#3fb950" },
             ] as const).map((p) => (
               <button

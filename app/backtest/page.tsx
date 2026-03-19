@@ -326,18 +326,28 @@ export default function BacktestPage() {
       order.filledAt = currentBar.time;
       order.filledPrice = currentBar.close;
 
-      const position: Position = {
-        id: genId(),
-        orderId: order.id,
-        direction,
-        entryPrice: currentBar.close,
-        entryTime: currentBar.time,
-        stopLoss: null,
-        takeProfit: null,
-      };
-
       setOrders((prev) => [...prev, order]);
-      setPositions((prev) => [...prev, position]);
+      setPositions((prev) => {
+        // Auto-inherit unified SL/TP from existing positions
+        let inheritedSL: number | null = null;
+        let inheritedTP: number | null = null;
+        if (prev.length > 0) {
+          const allSameSL = prev.every((p) => p.stopLoss != null && p.stopLoss === prev[0].stopLoss);
+          if (allSameSL && prev[0].stopLoss != null) inheritedSL = prev[0].stopLoss;
+          const allSameTP = prev.every((p) => p.takeProfit != null && p.takeProfit === prev[0].takeProfit);
+          if (allSameTP && prev[0].takeProfit != null) inheritedTP = prev[0].takeProfit;
+        }
+        const position: Position = {
+          id: genId(),
+          orderId: order.id,
+          direction,
+          entryPrice: currentBar.close,
+          entryTime: currentBar.time,
+          stopLoss: inheritedSL,
+          takeProfit: inheritedTP,
+        };
+        return [...prev, position];
+      });
     } else {
       setOrders((prev) => [...prev, order]);
     }
