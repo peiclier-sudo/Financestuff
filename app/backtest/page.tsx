@@ -23,6 +23,7 @@ import DayCharacteristics from "./components/DayCharacteristics";
 import HourlyStats from "./components/HourlyStats";
 import OrderPanel from "./components/OrderPanel";
 import PerformanceOverlay from "./components/PerformanceOverlay";
+import DayReviewModal from "./components/DayReviewModal";
 import DayPoolFilter from "./components/DayPoolFilter";
 
 let idCounter = 0;
@@ -53,6 +54,10 @@ export default function BacktestPage() {
 
   // Performance overlay
   const [showPerformance, setShowPerformance] = useState(false);
+
+  // Day review
+  const [showReview, setShowReview] = useState(false);
+  const [reviewFocusRange, setReviewFocusRange] = useState<{ entryTime: number; exitTime: number } | null>(null);
 
   // Pool filter
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
@@ -541,6 +546,7 @@ export default function BacktestPage() {
               prevDayATR={prevDayATR}
               tradingSize={tradingSize}
               onTradingSizeChange={setTradingSize}
+              focusRange={reviewFocusRange}
             />
           ) : (
             <div className="flex items-center justify-center h-full">
@@ -609,12 +615,25 @@ export default function BacktestPage() {
 
           {/* Day complete overlay showing the date */}
           {dayComplete && currentDay && (
-            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 glass-panel-sm px-4 py-2 text-center slide-in">
+            <div className="absolute bottom-10 left-1/2 -translate-x-1/2 z-40 glass-panel-sm px-4 py-3 text-center slide-in">
               <p className="text-[11px] text-[var(--text-muted)]">Day revealed:</p>
               <p className="text-sm font-bold text-[var(--text)]">{currentDay.date} ({currentDay.dayName})</p>
               <p className="text-[11px] font-mono mt-1" style={{ color: currentDay.changePercent >= 0 ? "var(--green)" : "var(--red)" }}>
                 {currentDay.changePercent >= 0 ? "+" : ""}{currentDay.changePercent.toFixed(2)}% | Range: {currentDay.rangePercent.toFixed(2)}%
               </p>
+              {closedTrades.length > 0 && (
+                <button
+                  onClick={() => setShowReview(true)}
+                  className="mt-2 text-[10px] font-mono font-semibold px-4 py-1.5 rounded transition-colors hover:brightness-110"
+                  style={{
+                    background: "rgba(88, 166, 255, 0.15)",
+                    border: "1px solid rgba(88, 166, 255, 0.3)",
+                    color: "#58a6ff",
+                  }}
+                >
+                  Review Your Day
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -675,6 +694,17 @@ export default function BacktestPage() {
         <PerformanceOverlay
           trades={sessionTrades}
           onClose={() => setShowPerformance(false)}
+        />
+      )}
+
+      {/* Day Review Modal */}
+      {showReview && currentDay && (
+        <DayReviewModal
+          closedTrades={closedTrades}
+          day={currentDay}
+          tradingSize={tradingSize}
+          onClose={() => { setShowReview(false); setReviewFocusRange(null); }}
+          onFocusTrade={(entryTime, exitTime) => setReviewFocusRange({ entryTime, exitTime })}
         />
       )}
     </div>

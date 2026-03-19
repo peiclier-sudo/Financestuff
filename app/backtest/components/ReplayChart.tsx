@@ -54,6 +54,7 @@ interface Props {
   prevDayATR: number | null;
   tradingSize: number;
   onTradingSizeChange: (size: number) => void;
+  focusRange?: { entryTime: number; exitTime: number } | null;
 }
 
 export default function ReplayChart({
@@ -74,6 +75,7 @@ export default function ReplayChart({
   prevDayATR,
   tradingSize,
   onTradingSizeChange,
+  focusRange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -673,6 +675,23 @@ export default function ReplayChart({
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updatePositions); } catch {}
     };
   }, [tradeLabels, posLabels]);
+
+  // Focus chart on trade range (for review mode)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !focusRange) return;
+
+    // Find bar indices for entry and exit times
+    const entryIdx = revealedBars.findIndex((b) => b.time >= focusRange.entryTime);
+    const exitIdx = revealedBars.findIndex((b) => b.time >= focusRange.exitTime);
+    if (entryIdx < 0 || exitIdx < 0) return;
+
+    // Add context bars on each side
+    const contextBars = 4;
+    const from = Math.max(0, entryIdx - contextBars);
+    const to = Math.min(revealedBars.length - 1, exitIdx + contextBars);
+    chart.timeScale().setVisibleLogicalRange({ from, to });
+  }, [focusRange, revealedBars]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
