@@ -605,6 +605,13 @@ select option { background: var(--surface-2); }
 }
 .slide-in { animation: slide-in 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
 
+/* Slide in from right — panel entrance */
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(100%); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.slide-in-right { animation: slide-in-right 0.35s cubic-bezier(0.22, 1, 0.36, 1); }
+
 /* Float in — spatial computing overlay entrance */
 @keyframes float-in {
   from {
