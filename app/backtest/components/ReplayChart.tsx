@@ -54,6 +54,7 @@ interface Props {
   prevDayATR: number | null;
   tradingSize: number;
   onTradingSizeChange: (size: number) => void;
+  focusRange?: { entryTime: number; exitTime: number } | null;
 }
 
 export default function ReplayChart({
@@ -74,6 +75,7 @@ export default function ReplayChart({
   prevDayATR,
   tradingSize,
   onTradingSizeChange,
+  focusRange,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -116,6 +118,13 @@ export default function ReplayChart({
     for (let i = 1; i < revealedBars.length; i++) {
       const curr = revealedBars[i];
       const prev = revealedBars[i - 1];
+      const currBody = Math.abs(curr.close - curr.open);
+      const currRange = curr.high - curr.low;
+      const prevBody = Math.abs(prev.close - prev.open);
+      const currBodyTop = Math.max(curr.open, curr.close);
+      const currBodyBot = Math.min(curr.open, curr.close);
+      const prevBodyTop = Math.max(prev.open, prev.close);
+      const prevBodyBot = Math.min(prev.open, prev.close);
 
       // Inside Bar: current bar's high/low is within previous bar's range
       if (activePatterns.has("insideBar")) {
@@ -128,6 +137,52 @@ export default function ReplayChart({
       if (activePatterns.has("outsideBar")) {
         if (curr.high > prev.high && curr.low < prev.low) {
           markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#d2a8ff", text: "OB", size: 0.5 });
+        }
+      }
+
+      // Pin Bar: huge tail, small body. Tail is >= 2x body size
+      if (activePatterns.has("pinBar") && currRange > 0) {
+        const upperTail = curr.high - currBodyTop;
+        const lowerTail = currBodyBot - curr.low;
+        const bodyRatio = currBody / currRange;
+        // Bull pin bar: long lower tail, body in upper third
+        if (bodyRatio <= 0.33 && lowerTail >= 2 * currBody && lowerTail > upperTail) {
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#3fb950", text: "PIN", size: 0.5 });
+        }
+        // Bear pin bar: long upper tail, body in lower third
+        else if (bodyRatio <= 0.33 && upperTail >= 2 * currBody && upperTail > lowerTail) {
+          markers.push({ time: curr.time, position: "aboveBar", shape: "arrowDown", color: "#f85149", text: "PIN", size: 0.5 });
+        }
+      }
+
+      // Umbrella: current bar's body is contained within previous bar's tail range
+      // i.e. the body of current candle sits within the wick of the previous candle
+      if (activePatterns.has("umbrella")) {
+        const prevUpperTail = prev.high - prevBodyTop;
+        const prevLowerTail = prevBodyBot - prev.low;
+        // Body fits in previous upper tail
+        if (prevUpperTail > 0 && currBodyBot >= prevBodyTop && currBodyTop <= prev.high) {
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#e3b341", text: "UMB", size: 0.5 });
+        }
+        // Body fits in previous lower tail
+        else if (prevLowerTail > 0 && currBodyTop <= prevBodyBot && currBodyBot >= prev.low) {
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#e3b341", text: "UMB", size: 0.5 });
+        }
+      }
+
+      // BOC (Bullish Outside Candle): closes in top 90% of range, larger body than prev, closes above prev high
+      if (activePatterns.has("boc") && currRange > 0) {
+        const closePosition = (curr.close - curr.low) / currRange; // 1.0 = top, 0.0 = bottom
+        if (closePosition >= 0.9 && currBody > prevBody && curr.close > prev.high) {
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#3fb950", text: "BOC", size: 0.5 });
+        }
+      }
+
+      // SOC (Bearish Outside Candle): closes in bottom 10% of range, larger body than prev, closes below prev low
+      if (activePatterns.has("soc") && currRange > 0) {
+        const closePosition = (curr.close - curr.low) / currRange;
+        if (closePosition <= 0.1 && currBody > prevBody && curr.close < prev.low) {
+          markers.push({ time: curr.time, position: "aboveBar", shape: "arrowDown", color: "#f85149", text: "SOC", size: 0.5 });
         }
       }
     }
@@ -363,7 +418,7 @@ export default function ReplayChart({
       const mult = p.direction === "long" ? 1 : -1;
       const pnlPts = (currentPrice - p.entryPrice) * mult;
       const pnl = pnlPts * tradingSize;
-      const pnlColor = pnlPts >= 0 ? "#3fb95090" : "#f8514990";
+      const pnlColor = pnlPts >= 0 ? "#3fb95040" : "#f8514940";
       const entryPl = series.createPriceLine({
         price: p.entryPrice,
         color: pnlColor,
@@ -388,7 +443,7 @@ export default function ReplayChart({
       if (p.stopLoss != null && !hasUnifiedSL) {
         const slPl = series.createPriceLine({
           price: p.stopLoss,
-          color: "#f8514960",
+          color: "#f85149cc",
           lineWidth: 1,
           lineStyle: 2,
           axisLabelVisible: true,
@@ -419,7 +474,7 @@ export default function ReplayChart({
     if (hasUnifiedSL && unifiedSL != null) {
       const slPl = series.createPriceLine({
         price: unifiedSL,
-        color: "#f8514980",
+        color: "#f85149dd",
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,
@@ -620,6 +675,23 @@ export default function ReplayChart({
       try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updatePositions); } catch {}
     };
   }, [tradeLabels, posLabels]);
+
+  // Focus chart on trade range (for review mode)
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || !focusRange) return;
+
+    // Find bar indices for entry and exit times
+    const entryIdx = revealedBars.findIndex((b) => b.time >= focusRange.entryTime);
+    const exitIdx = revealedBars.findIndex((b) => b.time >= focusRange.exitTime);
+    if (entryIdx < 0 || exitIdx < 0) return;
+
+    // Add context bars on each side
+    const contextBars = 4;
+    const from = Math.max(0, entryIdx - contextBars);
+    const to = Math.min(revealedBars.length - 1, exitIdx + contextBars);
+    chart.timeScale().setVisibleLogicalRange({ from, to });
+  }, [focusRange, revealedBars]);
 
   // Handle right-click for context menu
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -879,6 +951,10 @@ export default function ReplayChart({
             {([
               { id: "insideBar", label: "Inside Bar", color: "#58a6ff" },
               { id: "outsideBar", label: "Outside Bar", color: "#d2a8ff" },
+              { id: "pinBar", label: "Pin Bar", color: "#79c0ff" },
+              { id: "umbrella", label: "Umbrella", color: "#e3b341" },
+              { id: "boc", label: "BOC (Buy On Close)", color: "#3fb950" },
+              { id: "soc", label: "SOC (Sell On Close)", color: "#f85149" },
               { id: "orbBreakout", label: "ORB (First 3 Bars)", color: "#3fb950" },
             ] as const).map((p) => (
               <button
