@@ -229,25 +229,25 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
         style={{
           background: "linear-gradient(160deg, rgba(12, 15, 21, 0.98), rgba(18, 22, 30, 0.95))",
           backdropFilter: "blur(32px) saturate(1.4)",
-          borderLeft: "1px solid rgba(255, 255, 255, 0.08)",
+          borderLeft: "1px solid rgba(255, 255, 255, 0.10)",
           boxShadow: "-8px 0 64px rgba(0,0,0,0.6)",
         }}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{
-          background: "linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, transparent 100%)",
-          borderBottom: "1px solid rgba(255, 255, 255, 0.04)",
+          background: "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)",
+          borderBottom: "1px solid rgba(255, 255, 255, 0.06)",
         }}>
           <div className="flex gap-1.5">
-            <div className="w-[8px] h-[8px] rounded-full cursor-pointer hover:opacity-100" style={{ background: "rgba(255, 255, 255, 0.2)" }} onClick={onClose} />
-            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.12)" }} />
-            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.06)" }} />
+            <div className="w-[8px] h-[8px] rounded-full cursor-pointer hover:opacity-100" style={{ background: "rgba(255, 255, 255, 0.3)" }} onClick={onClose} />
+            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.15)" }} />
+            <div className="w-[8px] h-[8px] rounded-full" style={{ background: "rgba(255, 255, 255, 0.08)" }} />
           </div>
-          <div className="w-px h-4 bg-[var(--border)]" />
-          <span className="font-display text-[10px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(255, 255, 255, 0.5)" }}>
+          <div className="w-px h-4" style={{ background: "rgba(255,255,255,0.1)" }} />
+          <span className="font-display text-[11px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
             Review Your Day
           </span>
-          <span className="text-[10px] text-[var(--text-dim)]">{day.date}</span>
+          <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.4)" }}>{day.date}</span>
           {/* Progress */}
           <div className="ml-auto flex items-center gap-2">
             <div className="flex gap-1">
@@ -257,9 +257,9 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
                   className="w-2 h-2 rounded-full transition-colors cursor-pointer"
                   style={{
                     background: step === "trades" && i === currentGroupIdx
-                      ? "#58a6ff"
+                      ? "rgba(255,255,255,0.9)"
                       : i < currentGroupIdx || step === "day"
-                        ? "#3fb950"
+                        ? "rgba(255,255,255,0.4)"
                         : "rgba(255,255,255,0.15)",
                   }}
                   onClick={() => { setStep("trades"); setCurrentGroupIdx(i); }}
@@ -267,11 +267,11 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
               ))}
               <div
                 className="w-2 h-2 rounded-full transition-colors cursor-pointer"
-                style={{ background: step === "day" ? "#58a6ff" : "rgba(255,255,255,0.15)" }}
+                style={{ background: step === "day" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.15)" }}
                 onClick={() => setStep("day")}
               />
             </div>
-            <span className="text-[9px] text-[var(--text-dim)]">
+            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.45)" }}>
               {step === "trades" ? `Trade ${currentGroupIdx + 1}/${tradeGroups.length}` : "Summary"}
             </span>
           </div>
@@ -283,42 +283,42 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
             <>
               {/* Trade group header */}
               <div className="flex items-center gap-3">
-                <div className="text-[11px] font-mono px-2 py-0.5 rounded" style={{
-                  background: groupPnl >= 0 ? "rgba(63,185,80,0.1)" : "rgba(248,81,73,0.1)",
-                  border: `1px solid ${groupPnl >= 0 ? "rgba(63,185,80,0.2)" : "rgba(248,81,73,0.2)"}`,
+                <div className="text-[12px] font-mono font-bold px-2.5 py-1 rounded" style={{
+                  background: groupPnl >= 0 ? "rgba(63,185,80,0.12)" : "rgba(248,81,73,0.12)",
+                  border: `1px solid ${groupPnl >= 0 ? "rgba(63,185,80,0.25)" : "rgba(248,81,73,0.25)"}`,
                   color: groupPnl >= 0 ? "#3fb950" : "#f85149",
                 }}>
                   {groupPnl >= 0 ? "+" : ""}${groupPnl.toFixed(2)}
                 </div>
-                <span className="text-[10px] text-[var(--text-dim)]">
+                <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
                   {currentGroup.trades.length} {currentGroup.trades.length === 1 ? "entry" : "entries"} — Exit @ {currentGroup.trades[0].exitPrice.toFixed(1)}
                 </span>
               </div>
 
               {/* Trades table */}
-              <div className="rounded-md overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.06)" }}>
-                <table className="w-full text-[10px] font-mono">
+              <div className="rounded-md overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+                <table className="w-full text-[11px] font-mono">
                   <thead>
-                    <tr style={{ background: "rgba(255,255,255,0.03)" }}>
-                      <th className="text-left px-3 py-1.5 text-[var(--text-dim)] font-medium">Dir</th>
-                      <th className="text-right px-3 py-1.5 text-[var(--text-dim)] font-medium">Entry</th>
-                      <th className="text-right px-3 py-1.5 text-[var(--text-dim)] font-medium">Exit</th>
-                      <th className="text-right px-3 py-1.5 text-[var(--text-dim)] font-medium">P&L</th>
-                      <th className="text-right px-3 py-1.5 text-[var(--text-dim)] font-medium">Reason</th>
+                    <tr style={{ background: "rgba(255,255,255,0.04)" }}>
+                      <th className="text-left px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Dir</th>
+                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Entry</th>
+                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Exit</th>
+                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>P&L</th>
+                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Reason</th>
                     </tr>
                   </thead>
                   <tbody>
                     {currentGroup.trades.map((t) => (
-                      <tr key={t.id} style={{ borderTop: "1px solid rgba(255,255,255,0.04)" }}>
-                        <td className="px-3 py-1.5" style={{ color: t.direction === "long" ? "#3fb950" : "#f85149" }}>
+                      <tr key={t.id} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+                        <td className="px-3 py-2" style={{ color: t.direction === "long" ? "#3fb950" : "#f85149" }}>
                           {t.direction === "long" ? "LONG" : "SHORT"}
                         </td>
-                        <td className="text-right px-3 py-1.5 text-[var(--text)]">{t.entryPrice.toFixed(1)}</td>
-                        <td className="text-right px-3 py-1.5 text-[var(--text)]">{t.exitPrice.toFixed(1)}</td>
-                        <td className="text-right px-3 py-1.5" style={{ color: t.pnlPoints >= 0 ? "#3fb950" : "#f85149" }}>
+                        <td className="text-right px-3 py-2" style={{ color: "rgba(255,255,255,0.85)" }}>{t.entryPrice.toFixed(1)}</td>
+                        <td className="text-right px-3 py-2" style={{ color: "rgba(255,255,255,0.85)" }}>{t.exitPrice.toFixed(1)}</td>
+                        <td className="text-right px-3 py-2 font-semibold" style={{ color: t.pnlPoints >= 0 ? "#3fb950" : "#f85149" }}>
                           {t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(2)}
                         </td>
-                        <td className="text-right px-3 py-1.5 text-[var(--text-dim)] uppercase">{t.exitReason}</td>
+                        <td className="text-right px-3 py-2 uppercase" style={{ color: "rgba(255,255,255,0.4)" }}>{t.exitReason}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -327,14 +327,14 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
 
               {/* Rating */}
               <div>
-                <label className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">Execution Rating</label>
-                <div className="flex gap-1 mt-1">
+                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Execution Rating</label>
+                <div className="flex gap-1.5 mt-1.5">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
                       onClick={() => updateReview(currentGroup.exitTime, { rating: n })}
-                      className="text-[18px] transition-transform hover:scale-110"
-                      style={{ color: n <= currentReview.rating ? "#e3b341" : "rgba(255,255,255,0.15)" }}
+                      className="text-[20px] transition-transform hover:scale-110"
+                      style={{ color: n <= currentReview.rating ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)" }}
                     >
                       ★
                     </button>
@@ -344,17 +344,17 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
 
               {/* Tags */}
               <div>
-                <label className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">Tags</label>
-                <div className="flex flex-wrap gap-1.5 mt-1">
+                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Tags</label>
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
                   {REVIEW_TAGS.map((tag) => (
                     <button
                       key={tag}
                       onClick={() => toggleTag(currentGroup.exitTime, tag)}
-                      className="text-[9px] font-mono px-2 py-0.5 rounded-full transition-colors"
+                      className="text-[10px] font-mono px-2.5 py-1 rounded-full transition-colors"
                       style={{
-                        background: currentReview.tags.has(tag) ? "rgba(88, 166, 255, 0.15)" : "rgba(255,255,255,0.04)",
-                        border: `1px solid ${currentReview.tags.has(tag) ? "rgba(88, 166, 255, 0.3)" : "rgba(255,255,255,0.08)"}`,
-                        color: currentReview.tags.has(tag) ? "#58a6ff" : "#7d8590",
+                        background: currentReview.tags.has(tag) ? "rgba(255, 255, 255, 0.12)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${currentReview.tags.has(tag) ? "rgba(255, 255, 255, 0.30)" : "rgba(255,255,255,0.08)"}`,
+                        color: currentReview.tags.has(tag) ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
                       }}
                     >
                       {tag}
@@ -364,11 +364,11 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
                     <button
                       key={tag}
                       onClick={() => removeCustomTag(currentGroup.exitTime, tag)}
-                      className="text-[9px] font-mono px-2 py-0.5 rounded-full"
+                      className="text-[10px] font-mono px-2.5 py-1 rounded-full"
                       style={{
-                        background: "rgba(210, 168, 255, 0.15)",
-                        border: "1px solid rgba(210, 168, 255, 0.3)",
-                        color: "#d2a8ff",
+                        background: "rgba(255, 255, 255, 0.12)",
+                        border: "1px solid rgba(255, 255, 255, 0.25)",
+                        color: "rgba(255,255,255,0.85)",
                       }}
                     >
                       {tag} ×
@@ -383,8 +383,8 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
                         if (e.key === "Enter") addCustomTag(currentGroup.exitTime, customTagInput);
                       }}
                       placeholder="+ custom"
-                      className="text-[9px] font-mono px-2 py-0.5 rounded-full bg-transparent outline-none w-16"
-                      style={{ border: "1px dashed rgba(255,255,255,0.1)", color: "#7d8590" }}
+                      className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-transparent outline-none w-20"
+                      style={{ border: "1px dashed rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.5)" }}
                     />
                   </div>
                 </div>
@@ -417,35 +417,35 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
           {step === "day" && (
             <>
               <div className="text-center space-y-1">
-                <p className="text-[13px] font-semibold text-[var(--text)]">Day Summary</p>
-                <p className="text-[10px] text-[var(--text-dim)]">{day.date} ({day.dayName})</p>
+                <p className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Day Summary</p>
+                <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>{day.date} ({day.dayName})</p>
               </div>
 
               {/* Stats overview */}
               <div className="grid grid-cols-4 gap-2">
                 {[
                   { label: "P&L", value: `$${stats.totalPnl.toFixed(2)}`, color: stats.totalPnl >= 0 ? "#3fb950" : "#f85149" },
-                  { label: "Win Rate", value: `${stats.winRate.toFixed(0)}%`, color: "#58a6ff" },
-                  { label: "Trades", value: `${stats.totalTrades}`, color: "#7d8590" },
-                  { label: "PF", value: stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2), color: "#e3b341" },
+                  { label: "Win Rate", value: `${stats.winRate.toFixed(0)}%`, color: "rgba(255,255,255,0.85)" },
+                  { label: "Trades", value: `${stats.totalTrades}`, color: "rgba(255,255,255,0.6)" },
+                  { label: "PF", value: stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2), color: "rgba(255,255,255,0.85)" },
                 ].map((s) => (
-                  <div key={s.label} className="text-center py-2 rounded-md" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  <div key={s.label} className="text-center py-2.5 rounded-md" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
                     <div className="text-[14px] font-mono font-bold" style={{ color: s.color }}>{s.value}</div>
-                    <div className="text-[8px] uppercase tracking-wider text-[var(--text-dim)]">{s.label}</div>
+                    <div className="text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
               {/* Day rating */}
               <div>
-                <label className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">Overall Day Rating</label>
-                <div className="flex gap-1 mt-1">
+                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Overall Day Rating</label>
+                <div className="flex gap-1.5 mt-1.5">
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button
                       key={n}
                       onClick={() => setDayRating(n)}
-                      className="text-[22px] transition-transform hover:scale-110"
-                      style={{ color: n <= dayRating ? "#e3b341" : "rgba(255,255,255,0.15)" }}
+                      className="text-[24px] transition-transform hover:scale-110"
+                      style={{ color: n <= dayRating ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)" }}
                     >
                       ★
                     </button>
@@ -465,13 +465,13 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
               {/* User ID display */}
               {showUserId && (
                 <div className="rounded-md p-3 text-center space-y-1" style={{
-                  background: "rgba(63, 185, 80, 0.08)",
-                  border: "1px solid rgba(63, 185, 80, 0.2)",
+                  background: "rgba(255, 255, 255, 0.04)",
+                  border: "1px solid rgba(255, 255, 255, 0.12)",
                 }}>
-                  <p className="text-[10px] text-[var(--text-dim)]">Your review code (save this to retrieve your journal):</p>
-                  <p className="text-[16px] font-mono font-bold text-[#3fb950] tracking-wide">{userInfo.id}</p>
+                  <p className="text-[10px]" style={{ color: "rgba(255,255,255,0.5)" }}>Your review code (save this to retrieve your journal):</p>
+                  <p className="text-[16px] font-mono font-bold tracking-wide" style={{ color: "rgba(255,255,255,0.95)" }}>{userInfo.id}</p>
                   {userInfo.isNew && (
-                    <p className="text-[9px] text-[var(--text-dim)]">First review! This code is saved in your browser.</p>
+                    <p className="text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>First review! This code is saved in your browser.</p>
                   )}
                 </div>
               )}
@@ -481,14 +481,14 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
 
         {/* Footer — navigation */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{
-          borderTop: "1px solid rgba(255, 255, 255, 0.04)",
-          background: "rgba(0,0,0,0.15)",
+          borderTop: "1px solid rgba(255, 255, 255, 0.06)",
+          background: "rgba(0,0,0,0.2)",
         }}>
           <button
             onClick={handlePrev}
             disabled={step === "trades" && currentGroupIdx === 0}
-            className="text-[10px] font-mono px-3 py-1.5 rounded transition-colors disabled:opacity-30"
-            style={{ background: "rgba(255,255,255,0.06)", color: "#7d8590", border: "1px solid rgba(255,255,255,0.08)" }}
+            className="text-[10px] font-mono px-3 py-1.5 rounded transition-colors disabled:opacity-20"
+            style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}
           >
             Previous
           </button>
@@ -499,11 +499,11 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
             <button
               onClick={handleSubmit}
               disabled={saving}
-              className="text-[10px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
+              className="text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
               style={{
-                background: saving ? "rgba(63, 185, 80, 0.2)" : "rgba(63, 185, 80, 0.15)",
-                border: "1px solid rgba(63, 185, 80, 0.3)",
-                color: "#3fb950",
+                background: saving ? "rgba(255, 255, 255, 0.08)" : "rgba(255, 255, 255, 0.12)",
+                border: "1px solid rgba(255, 255, 255, 0.25)",
+                color: "rgba(255,255,255,0.9)",
               }}
             >
               {saving ? "Saving..." : "Submit Review"}
@@ -513,8 +513,8 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
           {saved && (
             <button
               onClick={onClose}
-              className="text-[10px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
-              style={{ background: "rgba(88, 166, 255, 0.15)", border: "1px solid rgba(88, 166, 255, 0.3)", color: "#58a6ff" }}
+              className="text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
+              style={{ background: "rgba(255, 255, 255, 0.12)", border: "1px solid rgba(255, 255, 255, 0.25)", color: "rgba(255,255,255,0.9)" }}
             >
               Done
             </button>
@@ -523,20 +523,10 @@ export default function DayReviewModal({ closedTrades, day, tradingSize, onClose
           {step === "trades" && (
             <button
               onClick={handleNext}
-              className="text-[10px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
-              style={{ background: "rgba(88, 166, 255, 0.15)", border: "1px solid rgba(88, 166, 255, 0.3)", color: "#58a6ff" }}
+              className="text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
+              style={{ background: "rgba(255, 255, 255, 0.12)", border: "1px solid rgba(255, 255, 255, 0.25)", color: "rgba(255,255,255,0.9)" }}
             >
               {currentGroupIdx < tradeGroups.length - 1 ? "Next Trade" : "Day Summary"}
-            </button>
-          )}
-
-          {step === "day" && !saved && (
-            <button
-              onClick={handleNext}
-              disabled
-              className="text-[10px] font-mono px-3 py-1.5 rounded opacity-0 pointer-events-none"
-            >
-              &nbsp;
             </button>
           )}
         </div>
@@ -554,20 +544,20 @@ function ReviewField({ label, value, onChange, placeholder, rows = 2 }: {
 }) {
   return (
     <div>
-      <label className="text-[9px] uppercase tracking-wider text-[var(--text-dim)] font-semibold">{label}</label>
+      <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</label>
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="w-full mt-1 text-[11px] font-mono px-3 py-2 rounded-md bg-transparent outline-none resize-none"
+        className="w-full mt-1.5 text-[11px] font-mono px-3 py-2 rounded-md bg-transparent outline-none resize-none"
         style={{
-          border: "1px solid rgba(255,255,255,0.08)",
-          color: "var(--text)",
+          border: "1px solid rgba(255,255,255,0.10)",
+          color: "rgba(255,255,255,0.85)",
           background: "rgba(255,255,255,0.02)",
         }}
-        onFocus={(e) => { e.target.style.borderColor = "rgba(88, 166, 255, 0.3)"; }}
-        onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+        onFocus={(e) => { e.target.style.borderColor = "rgba(255, 255, 255, 0.25)"; }}
+        onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.10)"; }}
       />
     </div>
   );

@@ -129,14 +129,14 @@ export default function ReplayChart({
       // Inside Bar: current bar's high/low is within previous bar's range
       if (activePatterns.has("insideBar")) {
         if (curr.high <= prev.high && curr.low >= prev.low) {
-          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#58a6ff", text: "IB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#c0c0c0", text: "IB", size: 0.5 });
         }
       }
 
       // Outside Bar: current bar engulfs previous bar
       if (activePatterns.has("outsideBar")) {
         if (curr.high > prev.high && curr.low < prev.low) {
-          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#d2a8ff", text: "OB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#e0e0e0", text: "OB", size: 0.5 });
         }
       }
 
@@ -162,11 +162,11 @@ export default function ReplayChart({
         const prevLowerTail = prevBodyBot - prev.low;
         // Body fits in previous upper tail
         if (prevUpperTail > 0 && currBodyBot >= prevBodyTop && currBodyTop <= prev.high) {
-          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#e3b341", text: "UMB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#a0a0a0", text: "UMB", size: 0.5 });
         }
         // Body fits in previous lower tail
         else if (prevLowerTail > 0 && currBodyTop <= prevBodyBot && currBodyBot >= prev.low) {
-          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#e3b341", text: "UMB", size: 0.5 });
+          markers.push({ time: curr.time, position: "belowBar", shape: "arrowUp", color: "#a0a0a0", text: "UMB", size: 0.5 });
         }
       }
 
@@ -687,7 +687,7 @@ export default function ReplayChart({
     if (entryIdx < 0 || exitIdx < 0) return;
 
     // Add context bars on each side
-    const contextBars = 4;
+    const contextBars = 8;
     const from = Math.max(0, entryIdx - contextBars);
     const to = Math.min(revealedBars.length - 1, exitIdx + contextBars);
     chart.timeScale().setVisibleLogicalRange({ from, to });
@@ -930,10 +930,10 @@ export default function ReplayChart({
           onClick={() => setPatternMenuOpen((v) => !v)}
           className="text-[9px] font-mono px-2 py-1 rounded transition-colors"
           style={{
-            background: activePatterns.size > 0 ? "rgba(88, 166, 255, 0.12)" : "rgba(12, 15, 21, 0.7)",
+            background: activePatterns.size > 0 ? "rgba(255, 255, 255, 0.10)" : "rgba(12, 15, 21, 0.7)",
             backdropFilter: "blur(12px)",
-            border: `1px solid ${activePatterns.size > 0 ? "rgba(88, 166, 255, 0.3)" : "rgba(255,255,255,0.06)"}`,
-            color: activePatterns.size > 0 ? "#58a6ff" : "#7d8590",
+            border: `1px solid ${activePatterns.size > 0 ? "rgba(255, 255, 255, 0.25)" : "rgba(255,255,255,0.06)"}`,
+            color: activePatterns.size > 0 ? "rgba(255,255,255,0.85)" : "#7d8590",
           }}
         >
           Patterns{activePatterns.size > 0 ? ` (${activePatterns.size})` : ""}
@@ -949,25 +949,26 @@ export default function ReplayChart({
             }}
           >
             {([
-              { id: "insideBar", label: "Inside Bar", color: "#58a6ff" },
-              { id: "outsideBar", label: "Outside Bar", color: "#d2a8ff" },
-              { id: "pinBar", label: "Pin Bar", color: "#79c0ff" },
-              { id: "umbrella", label: "Umbrella", color: "#e3b341" },
-              { id: "boc", label: "BOC (Buy On Close)", color: "#3fb950" },
-              { id: "soc", label: "SOC (Sell On Close)", color: "#f85149" },
-              { id: "orbBreakout", label: "ORB (First 3 Bars)", color: "#3fb950" },
+              { id: "insideBar", label: "Inside Bar" },
+              { id: "outsideBar", label: "Outside Bar" },
+              { id: "pinBar", label: "Pin Bar" },
+              { id: "umbrella", label: "Umbrella" },
+              { id: "boc", label: "BOC (Buy On Close)" },
+              { id: "soc", label: "SOC (Sell On Close)" },
+              { id: "orbBreakout", label: "ORB (First 3 Bars)" },
             ] as const).map((p) => (
               <button
                 key={p.id}
                 onClick={() => togglePattern(p.id)}
                 className="flex items-center gap-2 w-full px-3 py-1.5 text-[10px] font-mono transition-colors hover:bg-white/5"
-                style={{ color: activePatterns.has(p.id) ? p.color : "#7d8590" }}
+                style={{ color: activePatterns.has(p.id) ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.4)" }}
               >
                 <span
                   className="w-3 h-3 rounded-[3px] border flex items-center justify-center text-[8px]"
                   style={{
-                    borderColor: activePatterns.has(p.id) ? p.color : "rgba(255,255,255,0.15)",
-                    background: activePatterns.has(p.id) ? `${p.color}20` : "transparent",
+                    borderColor: activePatterns.has(p.id) ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.15)",
+                    background: activePatterns.has(p.id) ? "rgba(255,255,255,0.12)" : "transparent",
+                    color: "rgba(255,255,255,0.85)",
                   }}
                 >
                   {activePatterns.has(p.id) ? "✓" : ""}

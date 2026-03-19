@@ -624,11 +624,11 @@ export default function BacktestPage() {
               {closedTrades.length > 0 && (
                 <button
                   onClick={() => setShowReview(true)}
-                  className="mt-2 text-[10px] font-mono font-semibold px-4 py-1.5 rounded transition-colors hover:brightness-110"
+                  className="mt-2 text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors hover:brightness-110"
                   style={{
-                    background: "rgba(88, 166, 255, 0.15)",
-                    border: "1px solid rgba(88, 166, 255, 0.3)",
-                    color: "#58a6ff",
+                    background: "rgba(255, 255, 255, 0.10)",
+                    border: "1px solid rgba(255, 255, 255, 0.20)",
+                    color: "rgba(255,255,255,0.85)",
                   }}
                 >
                   Review Your Day
