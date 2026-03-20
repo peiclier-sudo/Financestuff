@@ -2,286 +2,453 @@ import { jsPDF } from "jspdf";
 import { ChallengeReview } from "./challengeTypes";
 import { TradeGroupReview } from "./reviewTypes";
 
+// ── Color palette ──
+const BG = "#0d1117";
+const SURFACE = "#161b22";
+const BORDER = "#2a2f38";
+const WHITE = "#ffffff";
+const TEXT = "#e6edf3";
+const TEXT_DIM = "#8b949e";
+const GREY = "#6e7681";
+const GREEN = "#3fb950";
+const RED = "#f85149";
+
 export function generateChallengePdf(review: ChallengeReview): void {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W = 210;
-  const margin = 15;
-  const usable = W - margin * 2;
-  let y = margin;
+  const H = 297;
+  const mg = 16;
+  const usable = W - mg * 2;
+  let y = 0;
 
-  const addPage = () => { doc.addPage(); y = margin; };
-  const checkPage = (needed: number) => { if (y + needed > 280) addPage(); };
+  // ── Helpers ──
+  const paintBg = () => {
+    doc.setFillColor(BG);
+    doc.rect(0, 0, W, H, "F");
+  };
 
-  // Colors
-  const black = "#0d1117";
-  const white = "#ffffff";
-  const grey = "#7d8590";
-  const green = "#3fb950";
-  const red = "#f85149";
-  const lightGrey = "#c0c0c0";
+  const newPage = () => {
+    doc.addPage();
+    paintBg();
+    drawPageFooter();
+    y = mg;
+  };
 
-  // Background
-  doc.setFillColor(black);
-  doc.rect(0, 0, W, 297, "F");
+  const need = (h: number) => { if (y + h > H - 14) newPage(); };
 
-  // Title
+  const drawLine = (yy: number, color = BORDER) => {
+    doc.setDrawColor(color);
+    doc.setLineWidth(0.15);
+    doc.line(mg, yy, W - mg, yy);
+  };
+
+  const drawCard = (x: number, cy: number, w: number, h: number) => {
+    doc.setFillColor(SURFACE);
+    doc.setDrawColor(BORDER);
+    doc.setLineWidth(0.15);
+    doc.roundedRect(x, cy, w, h, 1.5, 1.5, "FD");
+  };
+
+  let pageNum = 0;
+  const drawPageFooter = () => {
+    pageNum++;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(GREY);
+    doc.text(`Challenge ${review.challenge.target} Report`, mg, H - 6);
+    doc.text(`Page ${pageNum}`, W - mg, H - 6, { align: "right" });
+  };
+
+  const sectionTitle = (title: string) => {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(TEXT_DIM);
+    doc.text(title.toUpperCase(), mg, y);
+    y += 5;
+  };
+
+  const stats = review.stats;
+  const trades = review.challenge.allTrades;
+  const dateStr = new Date(review.challenge.startedAt).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+  // ════════════════════════════════════════════
+  // PAGE 1: Cover + Stats + Charts
+  // ════════════════════════════════════════════
+
+  paintBg();
+  drawPageFooter();
+
+  // ── Top accent line ──
+  doc.setFillColor(WHITE);
+  doc.rect(mg, mg, usable, 0.4, "F");
+  y = mg + 6;
+
+  // ── Title ──
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(white);
-  doc.text(`CHALLENGE ${review.challenge.target}`, margin, y + 8);
+  doc.setFontSize(28);
+  doc.setTextColor(WHITE);
+  doc.text(`CHALLENGE ${review.challenge.target}`, mg, y + 8);
   y += 14;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.setTextColor(grey);
-  doc.text(`${review.stats.daysPlayed} days | ${review.stats.totalExits} exits | ${review.stats.totalTrades} trades`, margin, y);
-  const dateStr = new Date(review.challenge.startedAt).toLocaleDateString();
-  doc.text(`Started: ${dateStr}`, W - margin, y, { align: "right" });
+  doc.setFontSize(10);
+  doc.setTextColor(TEXT_DIM);
+  doc.text(`${stats.daysPlayed} days  ·  ${stats.totalExits} exits  ·  ${stats.totalTrades} trades`, mg, y);
+  y += 5;
+  doc.setFontSize(8);
+  doc.setTextColor(GREY);
+  doc.text(dateStr, mg, y);
   y += 10;
 
-  // Divider
-  doc.setDrawColor(grey);
-  doc.setLineWidth(0.2);
-  doc.line(margin, y, W - margin, y);
+  drawLine(y);
   y += 8;
 
-  // Stats grid
-  const stats = review.stats;
+  // ── Stats grid (2 rows of 5) ──
+  sectionTitle("Performance");
+
   const statItems = [
-    { label: "Total P&L", value: `$${stats.totalPnl.toFixed(2)}`, color: stats.totalPnl >= 0 ? green : red },
-    { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%`, color: white },
-    { label: "Profit Factor", value: stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2), color: white },
-    { label: "Avg Win", value: `$${stats.avgWin.toFixed(2)}`, color: green },
-    { label: "Avg Loss", value: `$${stats.avgLoss.toFixed(2)}`, color: red },
-    { label: "Best Trade", value: `$${stats.bestTrade.toFixed(2)}`, color: green },
-    { label: "Worst Trade", value: `$${stats.worstTrade.toFixed(2)}`, color: red },
-    { label: "Max Drawdown", value: `$${stats.maxDrawdown.toFixed(2)}`, color: red },
-    { label: "Max Runup", value: `$${stats.maxRunup.toFixed(2)}`, color: green },
-    { label: "Avg P&L", value: `$${stats.avgPnl.toFixed(2)}`, color: stats.avgPnl >= 0 ? green : red },
+    { label: "Total P&L", value: `$${stats.totalPnl.toFixed(2)}`, color: stats.totalPnl >= 0 ? GREEN : RED },
+    { label: "Win Rate", value: `${stats.winRate.toFixed(1)}%`, color: WHITE },
+    { label: "Profit Factor", value: stats.profitFactor === Infinity ? "∞" : stats.profitFactor.toFixed(2), color: WHITE },
+    { label: "Avg Win", value: `$${stats.avgWin.toFixed(2)}`, color: GREEN },
+    { label: "Avg Loss", value: `$${stats.avgLoss.toFixed(2)}`, color: RED },
+    { label: "Best Trade", value: `$${stats.bestTrade.toFixed(2)}`, color: GREEN },
+    { label: "Worst Trade", value: `$${stats.worstTrade.toFixed(2)}`, color: RED },
+    { label: "Max Drawdown", value: `$${stats.maxDrawdown.toFixed(2)}`, color: RED },
+    { label: "Max Runup", value: `$${stats.maxRunup.toFixed(2)}`, color: GREEN },
+    { label: "Avg P&L", value: `$${stats.avgPnl.toFixed(2)}`, color: stats.avgPnl >= 0 ? GREEN : RED },
   ];
 
-  const cols = 3;
-  const colW = usable / cols;
+  const cardCols = 5;
+  const cardGap = 2.5;
+  const cardW = (usable - cardGap * (cardCols - 1)) / cardCols;
+  const cardH = 16;
+
   statItems.forEach((s, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const x = margin + col * colW;
-    const sy = y + row * 12;
+    const col = i % cardCols;
+    const row = Math.floor(i / cardCols);
+    const cx = mg + col * (cardW + cardGap);
+    const cy = y + row * (cardH + cardGap);
+
+    drawCard(cx, cy, cardW, cardH);
 
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(grey);
-    doc.text(s.label.toUpperCase(), x, sy);
+    doc.setFontSize(5.5);
+    doc.setTextColor(GREY);
+    doc.text(s.label.toUpperCase(), cx + cardW / 2, cy + 5.5, { align: "center" });
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor(s.color);
-    doc.text(s.value, x, sy + 5);
+    doc.text(s.value, cx + cardW / 2, cy + 11.5, { align: "center" });
   });
-  y += Math.ceil(statItems.length / cols) * 12 + 5;
+  y += Math.ceil(statItems.length / cardCols) * (cardH + cardGap) + 6;
 
-  // Overall rating
-  checkPage(15);
+  // ── Overall rating ──
+  drawLine(y);
+  y += 6;
+  sectionTitle("Overall Rating");
+
+  const starsFilled = review.overallRating;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  doc.setTextColor(grey);
-  doc.text("OVERALL RATING", margin, y);
-  y += 5;
-  doc.setFontSize(14);
-  doc.setTextColor(white);
-  const stars = "★".repeat(review.overallRating) + "☆".repeat(5 - review.overallRating);
-  doc.text(stars, margin, y);
-  y += 4;
+  doc.setFontSize(16);
+  doc.setTextColor(WHITE);
+  doc.text("★".repeat(starsFilled), mg, y + 1);
+  doc.setTextColor("#2a2f38");
+  doc.text("★".repeat(5 - starsFilled), mg + starsFilled * 6.5, y + 1);
+  y += 7;
+
   if (review.overallNotes) {
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
-    doc.setTextColor(lightGrey);
-    const lines = doc.splitTextToSize(review.overallNotes, usable);
-    doc.text(lines, margin, y + 4);
-    y += 4 + lines.length * 3.5;
+    doc.setTextColor(TEXT);
+    const noteLines = doc.splitTextToSize(review.overallNotes, usable);
+    drawCard(mg, y, usable, noteLines.length * 4 + 6);
+    doc.setTextColor(TEXT);
+    doc.text(noteLines, mg + 4, y + 5);
+    y += noteLines.length * 4 + 10;
   }
-  y += 8;
+  y += 4;
 
-  // Equity curve
-  checkPage(55);
-  doc.setDrawColor(grey);
-  doc.setLineWidth(0.2);
-  doc.line(margin, y, W - margin, y);
+  // ── Equity Curve ──
+  drawLine(y);
   y += 6;
+  sectionTitle("Equity Curve");
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(white);
-  doc.text("EQUITY CURVE", margin, y);
-  y += 6;
+  const chartH = 40;
+  drawCard(mg, y, usable, chartH);
 
-  const chartH = 35;
-  const chartW = usable;
-  const trades = review.challenge.allTrades;
-
-  // Compute equity points
   const equityPts: number[] = [0];
-  let eq = 0;
-  for (const t of trades) {
-    eq += t.pnlPoints;
-    equityPts.push(eq);
-  }
+  let eqVal = 0;
+  for (const t of trades) { eqVal += t.pnlPoints; equityPts.push(eqVal); }
   const eqMin = Math.min(...equityPts);
   const eqMax = Math.max(...equityPts);
   const eqRange = eqMax - eqMin || 1;
 
-  // Draw zero line
-  const zeroY = y + chartH - ((0 - eqMin) / eqRange) * chartH;
-  doc.setDrawColor("#333333");
-  doc.setLineWidth(0.1);
-  doc.line(margin, zeroY, margin + chartW, zeroY);
-
-  // Draw equity line
-  doc.setDrawColor(white);
-  doc.setLineWidth(0.5);
-  for (let i = 1; i < equityPts.length; i++) {
-    const x1 = margin + ((i - 1) / (equityPts.length - 1)) * chartW;
-    const x2 = margin + (i / (equityPts.length - 1)) * chartW;
-    const y1 = y + chartH - ((equityPts[i - 1] - eqMin) / eqRange) * chartH;
-    const y2 = y + chartH - ((equityPts[i] - eqMin) / eqRange) * chartH;
-    doc.line(x1, y1, x2, y2);
-  }
-  y += chartH + 8;
-
-  // Trade-by-trade bars
-  checkPage(50);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  doc.setTextColor(white);
-  doc.text("TRADE-BY-TRADE P&L", margin, y);
-  y += 6;
-
-  const barChartH = 30;
-  const maxAbsPnl = Math.max(...trades.map((t) => Math.abs(t.pnlPoints)), 0.01);
-  const barW = Math.min(chartW / trades.length, 8);
-  const barsStart = margin;
-  const barZeroY = y + barChartH / 2;
+  const chartLeft = mg + 3;
+  const chartRight = mg + usable - 3;
+  const chartTop = y + 4;
+  const chartBot = y + chartH - 4;
+  const chartInnerW = chartRight - chartLeft;
+  const chartInnerH = chartBot - chartTop;
 
   // Zero line
-  doc.setDrawColor("#333333");
+  const zeroChartY = chartBot - ((0 - eqMin) / eqRange) * chartInnerH;
+  doc.setDrawColor(BORDER);
   doc.setLineWidth(0.1);
-  doc.line(barsStart, barZeroY, barsStart + chartW, barZeroY);
+  doc.line(chartLeft, zeroChartY, chartRight, zeroChartY);
+
+  // Axis labels
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5);
+  doc.setTextColor(GREY);
+  doc.text(`$${eqMax.toFixed(0)}`, chartLeft - 1, chartTop + 2, { align: "right" });
+  doc.text(`$${eqMin.toFixed(0)}`, chartLeft - 1, chartBot, { align: "right" });
+  doc.text("$0", chartLeft - 1, zeroChartY + 1, { align: "right" });
+
+  // Gradient fill under curve (approximate with rectangles)
+  for (let i = 1; i < equityPts.length; i++) {
+    const x1 = chartLeft + ((i - 1) / (equityPts.length - 1)) * chartInnerW;
+    const x2 = chartLeft + (i / (equityPts.length - 1)) * chartInnerW;
+    const cy1 = chartBot - ((equityPts[i - 1] - eqMin) / eqRange) * chartInnerH;
+    const cy2 = chartBot - ((equityPts[i] - eqMin) / eqRange) * chartInnerH;
+    const topY = Math.min(cy1, cy2);
+
+    // Subtle fill from curve to zero
+    const fillAlpha = equityPts[i] >= 0 ? GREEN : RED;
+    doc.setFillColor(fillAlpha);
+    doc.setGState(doc.GState({ opacity: 0.08 }));
+    doc.rect(x1, topY, x2 - x1, zeroChartY - topY, "F");
+    doc.setGState(doc.GState({ opacity: 1 }));
+  }
+
+  // Draw equity line
+  doc.setDrawColor(WHITE);
+  doc.setLineWidth(0.6);
+  for (let i = 1; i < equityPts.length; i++) {
+    const x1 = chartLeft + ((i - 1) / (equityPts.length - 1)) * chartInnerW;
+    const x2 = chartLeft + (i / (equityPts.length - 1)) * chartInnerW;
+    const cy1 = chartBot - ((equityPts[i - 1] - eqMin) / eqRange) * chartInnerH;
+    const cy2 = chartBot - ((equityPts[i] - eqMin) / eqRange) * chartInnerH;
+    doc.line(x1, cy1, x2, cy2);
+  }
+
+  // End value dot
+  if (equityPts.length > 1) {
+    const lastX = chartRight;
+    const lastY = chartBot - ((equityPts[equityPts.length - 1] - eqMin) / eqRange) * chartInnerH;
+    doc.setFillColor(eqVal >= 0 ? GREEN : RED);
+    doc.circle(lastX, lastY, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6);
+    doc.setTextColor(eqVal >= 0 ? GREEN : RED);
+    doc.text(`$${eqVal.toFixed(1)}`, lastX - 2, lastY - 2, { align: "right" });
+  }
+
+  y += chartH + 6;
+
+  // ── Trade-by-trade P&L bars ──
+  drawLine(y);
+  y += 6;
+  sectionTitle("Trade-by-Trade P&L");
+
+  const barCardH = 35;
+  drawCard(mg, y, usable, barCardH);
+
+  const barLeft = mg + 3;
+  const barRight = mg + usable - 3;
+  const barTop = y + 4;
+  const barBot = y + barCardH - 4;
+  const barInnerW = barRight - barLeft;
+  const barInnerH = barBot - barTop;
+  const barZeroY2 = barTop + barInnerH / 2;
+
+  doc.setDrawColor(BORDER);
+  doc.setLineWidth(0.1);
+  doc.line(barLeft, barZeroY2, barRight, barZeroY2);
+
+  const maxAbsPnl = Math.max(...trades.map((t) => Math.abs(t.pnlPoints)), 0.01);
+  const barW = Math.min(barInnerW / trades.length, 6);
+  const totalBarsW = barW * trades.length;
+  const barOffset = barLeft + (barInnerW - totalBarsW) / 2;
 
   for (let i = 0; i < trades.length; i++) {
     const t = trades[i];
-    const barH = (Math.abs(t.pnlPoints) / maxAbsPnl) * (barChartH / 2 - 1);
-    const x = barsStart + i * barW + barW * 0.15;
-    const w = barW * 0.7;
+    const bh = (Math.abs(t.pnlPoints) / maxAbsPnl) * (barInnerH / 2 - 2);
+    const bx = barOffset + i * barW + barW * 0.15;
+    const bw = barW * 0.7;
 
+    doc.setFillColor(t.pnlPoints >= 0 ? GREEN : RED);
     if (t.pnlPoints >= 0) {
-      doc.setFillColor(green);
-      doc.rect(x, barZeroY - barH, w, barH, "F");
+      doc.rect(bx, barZeroY2 - bh, bw, bh, "F");
     } else {
-      doc.setFillColor(red);
-      doc.rect(x, barZeroY, w, barH, "F");
+      doc.rect(bx, barZeroY2, bw, bh, "F");
     }
   }
-  y += barChartH + 10;
 
-  // Trade reviews
-  addPage();
-  doc.setFillColor(black);
-  doc.rect(0, 0, W, 297, "F");
+  // Bar axis labels
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5);
+  doc.setTextColor(GREY);
+  doc.text("1", barOffset, barBot + 3);
+  doc.text(`${trades.length}`, barOffset + totalBarsW, barBot + 3, { align: "right" });
 
+  y += barCardH + 6;
+
+  // ════════════════════════════════════════════
+  // PAGE 2+: Trade Reviews
+  // ════════════════════════════════════════════
+
+  newPage();
+
+  // Section title
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.setTextColor(white);
-  doc.text("TRADE REVIEWS", margin, y + 6);
-  y += 14;
+  doc.setFontSize(18);
+  doc.setTextColor(WHITE);
+  doc.text("TRADE REVIEWS", mg, y + 5);
+  y += 12;
+  doc.setFontSize(8);
+  doc.setTextColor(TEXT_DIM);
+  doc.text(`${review.tradeGroupReviews.length} trade groups reviewed`, mg, y);
+  y += 8;
+
+  drawLine(y, WHITE);
+  y += 8;
 
   review.tradeGroupReviews.forEach((g: TradeGroupReview, i: number) => {
-    checkPage(45);
-    if (y > margin + 5) {
-      // Add background for new pages
-      if (y === margin) {
-        doc.setFillColor(black);
-        doc.rect(0, 0, W, 297, "F");
-      }
-    }
+    // Estimate height needed for this trade card
+    const hasNotes = !!(g.idea || g.coherent || g.executionNotes);
+    const allTags = [...g.tags, ...g.customTags];
+    const noteHeight = [g.idea, g.coherent, g.executionNotes]
+      .filter(Boolean)
+      .reduce((h, text) => h + doc.splitTextToSize(text!, usable - 22).length * 3.5 + 5, 0);
+    const cardEstimate = 20 + g.trades.length * 5 + (allTags.length > 0 ? 6 : 0) + (hasNotes ? noteHeight + 2 : 0);
+
+    need(cardEstimate + 4);
 
     const groupPnl = g.trades.reduce((s, t) => s + t.pnlPoints, 0);
+    const cardStart = y;
 
-    // Group header
+    // ── Trade number + P&L header ──
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(white);
-    doc.text(`Trade ${i + 1}`, margin, y);
+    doc.setFontSize(11);
+    doc.setTextColor(WHITE);
+    doc.text(`Trade ${i + 1}`, mg, y + 1);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(groupPnl >= 0 ? green : red);
-    doc.text(`${groupPnl >= 0 ? "+" : ""}$${groupPnl.toFixed(2)}`, margin + 25, y);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(groupPnl >= 0 ? GREEN : RED);
+    doc.text(`${groupPnl >= 0 ? "+" : ""}$${groupPnl.toFixed(2)}`, mg + 28, y + 1);
 
     // Rating
-    doc.setTextColor(white);
-    doc.text("★".repeat(g.rating) + "☆".repeat(5 - g.rating), W - margin, y, { align: "right" });
-    y += 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(WHITE);
+    const filledStars = "★".repeat(g.rating);
+    doc.text(filledStars, W - mg, y + 1, { align: "right" });
+    doc.setTextColor(BORDER);
+    doc.text("★".repeat(5 - g.rating), W - mg - g.rating * 4.2, y + 1, { align: "right" });
+    y += 7;
 
-    // Tags
-    const allTags = [...g.tags, ...g.customTags];
+    // Tags row
     if (allTags.length > 0) {
-      doc.setFontSize(7);
-      doc.setTextColor(lightGrey);
-      doc.text(allTags.join(" · "), margin, y);
-      y += 4;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(TEXT_DIM);
+
+      let tagX = mg;
+      allTags.forEach((tag) => {
+        const tw = doc.getTextWidth(tag) + 4;
+        if (tagX + tw > W - mg) { y += 4.5; tagX = mg; }
+        // Tag pill background
+        doc.setFillColor(SURFACE);
+        doc.setDrawColor(BORDER);
+        doc.setLineWidth(0.1);
+        doc.roundedRect(tagX, y - 2.5, tw, 4, 1, 1, "FD");
+        doc.setTextColor(TEXT_DIM);
+        doc.text(tag, tagX + 2, y);
+        tagX += tw + 1.5;
+      });
+      y += 5;
     }
 
     // Entries table
+    // Header
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    doc.setTextColor(GREY);
+    doc.text("DIR", mg + 2, y);
+    doc.text("ENTRY", mg + 22, y);
+    doc.text("EXIT", mg + 42, y);
+    doc.text("P&L", mg + 62, y);
+    doc.text("REASON", mg + 85, y);
+    y += 2;
+    drawLine(y, BORDER);
+    y += 3;
+
     g.trades.forEach((t) => {
+      doc.setFont("helvetica", "normal");
       doc.setFontSize(7);
-      doc.setTextColor(t.direction === "long" ? green : red);
-      doc.text(t.direction.toUpperCase(), margin, y);
-      doc.setTextColor(lightGrey);
-      doc.text(`${t.entryPrice.toFixed(1)} → ${t.exitPrice.toFixed(1)}`, margin + 18, y);
-      doc.setTextColor(t.pnlPoints >= 0 ? green : red);
-      doc.text(`${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(2)}`, margin + 55, y);
-      doc.setTextColor(grey);
-      doc.text(t.exitReason.toUpperCase(), margin + 80, y);
-      y += 3.5;
+
+      doc.setTextColor(t.direction === "long" ? GREEN : RED);
+      doc.text(t.direction === "long" ? "LONG" : "SHORT", mg + 2, y);
+
+      doc.setTextColor(TEXT);
+      doc.text(t.entryPrice.toFixed(1), mg + 22, y);
+      doc.text(t.exitPrice.toFixed(1), mg + 42, y);
+
+      doc.setTextColor(t.pnlPoints >= 0 ? GREEN : RED);
+      doc.text(`${t.pnlPoints >= 0 ? "+" : ""}$${t.pnlPoints.toFixed(2)}`, mg + 62, y);
+
+      doc.setTextColor(GREY);
+      doc.text(t.exitReason.toUpperCase(), mg + 85, y);
+      y += 4.5;
     });
     y += 2;
 
-    // Notes
-    if (g.idea) {
-      doc.setFontSize(7);
-      doc.setTextColor(grey);
-      doc.text("Idea: ", margin, y);
-      doc.setTextColor(lightGrey);
-      const ideaLines = doc.splitTextToSize(g.idea, usable - 12);
-      doc.text(ideaLines, margin + 12, y);
-      y += ideaLines.length * 3.5;
-    }
-    if (g.coherent) {
-      doc.setFontSize(7);
-      doc.setTextColor(grey);
-      doc.text("Plan: ", margin, y);
-      doc.setTextColor(lightGrey);
-      const planLines = doc.splitTextToSize(g.coherent, usable - 12);
-      doc.text(planLines, margin + 12, y);
-      y += planLines.length * 3.5;
-    }
-    if (g.executionNotes) {
-      doc.setFontSize(7);
-      doc.setTextColor(grey);
-      doc.text("Exec: ", margin, y);
-      doc.setTextColor(lightGrey);
-      const execLines = doc.splitTextToSize(g.executionNotes, usable - 12);
-      doc.text(execLines, margin + 12, y);
-      y += execLines.length * 3.5;
+    // Notes section
+    const noteEntries = [
+      { label: "IDEA", text: g.idea },
+      { label: "PLAN", text: g.coherent },
+      { label: "EXEC", text: g.executionNotes },
+    ].filter((n) => n.text);
+
+    if (noteEntries.length > 0) {
+      noteEntries.forEach((n) => {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6);
+        doc.setTextColor(GREY);
+        doc.text(n.label, mg + 2, y);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7);
+        doc.setTextColor(TEXT);
+        const noteLines = doc.splitTextToSize(n.text!, usable - 22);
+        doc.text(noteLines, mg + 16, y);
+        y += noteLines.length * 3.5 + 2;
+      });
     }
 
-    y += 5;
+    y += 2;
 
-    // Separator
-    doc.setDrawColor("#222222");
-    doc.setLineWidth(0.1);
-    doc.line(margin, y, W - margin, y);
-    y += 5;
+    // Card border around the whole trade
+    const cardHeight = y - cardStart + 2;
+    doc.setDrawColor(BORDER);
+    doc.setLineWidth(0.15);
+    doc.roundedRect(mg - 1, cardStart - 4, usable + 2, cardHeight + 2, 1.5, 1.5, "D");
+
+    y += 6;
   });
+
+  // ── Final page footer ──
+  need(20);
+  y += 4;
+  drawLine(y, GREY);
+  y += 6;
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.setTextColor(GREY);
+  doc.text("Generated by Backtest Challenge System", W / 2, y, { align: "center" });
 
   // Save
   const fileName = `challenge_${review.challenge.target}_${new Date().toISOString().slice(0, 10)}.pdf`;
