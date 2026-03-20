@@ -36,14 +36,28 @@ import {
   countExitEvents,
 } from "@/lib/challengeTypes";
 
+export interface Instrument {
+  id: string;
+  label: string;
+  file: string;
+}
+
+export const INSTRUMENTS: Instrument[] = [
+  { id: "nasdaq", label: "NASDAQ", file: "/NASDAQ_5min_NDX_From_2015.csv" },
+  { id: "copper", label: "COPPER", file: "/__HG_5min_2020_Futures.csv" },
+];
+
 let idCounter = 0;
 function genId() {
   return `id_${Date.now()}_${++idCounter}`;
 }
 
 export default function BacktestPage() {
+  // Instrument selection
+  const [selectedInstrument, setSelectedInstrument] = useState<Instrument | null>(null);
+
   const [allDays, setAllDays] = useState<TradingDay[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Replay state
@@ -93,11 +107,21 @@ export default function BacktestPage() {
   // Period selection
   const [periodRange, setPeriodRange] = useState<{ from: string; to: string } | null>(null);
 
-  // Load data
+  // Load data when instrument changes
   useEffect(() => {
-    fetch("/NASDAQ_5min_NDX_From_2015.csv")
+    if (!selectedInstrument) {
+      setAllDays([]);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setAllDays([]);
+    setPeriodRange(null);
+    setCurrentDay(null);
+    setSessionTrades([]);
+    fetch(selectedInstrument.file)
       .then((res) => {
-        if (!res.ok) throw new Error("CSV not found");
+        if (!res.ok) throw new Error(`${selectedInstrument.label} CSV not found`);
         return res.text();
       })
       .then((text) => {
@@ -110,7 +134,7 @@ export default function BacktestPage() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [selectedInstrument]);
 
   // Days filtered by selected period
   const periodDays = useMemo(() => {
@@ -625,12 +649,65 @@ export default function BacktestPage() {
     return () => { delete document.body.dataset.market; };
   }, [currentBar, currentDay]);
 
+  // Step 1: Instrument selection
+  if (!selectedInstrument) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: "#0d1117" }}>
+        <div className="w-full max-w-lg px-8">
+          <div className="text-center mb-10">
+            <h1 className="font-display text-2xl font-bold tracking-tight mb-2" style={{ color: "rgba(255,255,255,0.95)" }}>
+              Manual Backtest
+            </h1>
+            <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>
+              Select an instrument to trade
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {INSTRUMENTS.map((inst) => (
+              <button
+                key={inst.id}
+                onClick={() => setSelectedInstrument(inst)}
+                className="group relative p-6 rounded-xl transition-all hover:scale-[1.02]"
+                style={{
+                  background: "rgba(255,255,255,0.03)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{
+                  background: "radial-gradient(ellipse at center, rgba(255,255,255,0.06) 0%, transparent 70%)",
+                }} />
+                <div className="relative">
+                  <div className="text-[11px] font-mono uppercase tracking-widest mb-2" style={{
+                    color: inst.id === "nasdaq" ? "rgba(100,180,255,0.7)" : "rgba(220,160,80,0.7)",
+                  }}>
+                    {inst.id === "nasdaq" ? "Index" : "Commodity"}
+                  </div>
+                  <div className="text-lg font-display font-bold tracking-tight" style={{ color: "rgba(255,255,255,0.9)" }}>
+                    {inst.label}
+                  </div>
+                  <div className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.3)" }}>
+                    {inst.id === "nasdaq" ? "NDX 5min from 2015" : "HG Futures 5min from 2020"}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="text-center mt-6">
+            <Link href="/" className="text-[10px] transition-colors hover:text-white" style={{ color: "rgba(255,255,255,0.3)" }}>
+              &larr; Back to Home
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin w-6 h-6 border-2 border-white/40 border-t-transparent rounded-full mx-auto mb-3" />
-          <p className="text-[var(--text-muted)] text-sm">Loading NASDAQ data...</p>
+          <p className="text-[var(--text-muted)] text-sm">Loading {selectedInstrument.label} data...</p>
         </div>
       </div>
     );
@@ -642,17 +719,25 @@ export default function BacktestPage() {
         <div className="bg-[var(--surface)] border border-[var(--red-dim)] rounded-lg p-8 max-w-md text-center">
           <p className="text-[var(--red)] font-semibold mb-2">Error</p>
           <p className="text-[var(--text-muted)] text-sm">{error}</p>
+          <button
+            onClick={() => setSelectedInstrument(null)}
+            className="mt-3 text-[11px] text-[var(--text-dim)] hover:text-white transition-colors"
+          >
+            &larr; Pick another instrument
+          </button>
         </div>
       </div>
     );
   }
 
-  // Show period selector before trading starts
+  // Step 2: Period selection
   if (!periodRange) {
     return (
       <PeriodSelector
         allDays={allDays}
+        instrumentLabel={selectedInstrument.label}
         onConfirm={(from, to) => setPeriodRange({ from, to })}
+        onBack={() => setSelectedInstrument(null)}
       />
     );
   }
@@ -665,6 +750,38 @@ export default function BacktestPage() {
           &larr; Home
         </Link>
         <div className="w-px h-4 bg-[var(--border)]" />
+
+        {/* Instrument badge */}
+        {selectedInstrument && !challenge && (
+          <button
+            onClick={() => {
+              setSelectedInstrument(null);
+              setPeriodRange(null);
+              setCurrentDay(null);
+              setSessionTrades([]);
+              setAllDays([]);
+            }}
+            className="text-[9px] font-mono font-bold px-2 py-0.5 rounded transition-colors hover:bg-white/10"
+            style={{
+              color: selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.8)" : "rgba(220,160,80,0.8)",
+              border: `1px solid ${selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.2)" : "rgba(220,160,80,0.2)"}`,
+            }}
+            title="Change instrument"
+          >
+            {selectedInstrument.label}
+          </button>
+        )}
+        {selectedInstrument && challenge && (
+          <span
+            className="text-[9px] font-mono font-bold px-2 py-0.5 rounded"
+            style={{
+              color: selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.6)" : "rgba(220,160,80,0.6)",
+              border: `1px solid ${selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.12)" : "rgba(220,160,80,0.12)"}`,
+            }}
+          >
+            {selectedInstrument.label}
+          </span>
+        )}
 
         {/* Period indicator */}
         {periodRange && !challenge && (
