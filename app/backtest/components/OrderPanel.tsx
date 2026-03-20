@@ -16,6 +16,7 @@ interface Props {
   onUpdateAllSL: (sl: number | null) => void;
   onUpdateAllTP: (tp: number | null) => void;
   onExpandResults: () => void;
+  prevDayATR?: number | null;
   tradingSize: number;
 }
 
@@ -32,10 +33,14 @@ export default function OrderPanel({
   onUpdateAllSL,
   onUpdateAllTP,
   onExpandResults,
+  prevDayATR,
   tradingSize,
 }: Props) {
   const pendingOrders = orders.filter((o) => o.status === "pending");
   const currentPrice = currentBar?.close ?? 0;
+
+  // SL distance = half the previous day's ATR (fallback to 20 if ATR unavailable)
+  const slDistance = prevDayATR != null ? Math.round((prevDayATR / 2) * 100) / 100 : 20;
 
   // Session summary (all trades across all days)
   const totalPnl = sessionTrades.reduce((sum, t) => sum + t.pnlPoints, 0);
@@ -148,10 +153,9 @@ export default function OrderPanel({
                     if (allHaveSL) {
                       onUpdateAllSL(null);
                     } else {
-                      // Average entry, set SL 20pts away
                       const avgEntry = positions.reduce((s, p) => s + p.entryPrice, 0) / positions.length;
                       const isLong = positions[0].direction === "long";
-                      onUpdateAllSL(Math.round((isLong ? avgEntry - 20 : avgEntry + 20) * 10) / 10);
+                      onUpdateAllSL(Math.round((isLong ? avgEntry - slDistance : avgEntry + slDistance) * 100) / 100);
                     }
                   }}
                   className="text-[7px] px-1 py-0.5 rounded transition-colors"
@@ -168,7 +172,7 @@ export default function OrderPanel({
                     } else {
                       const avgEntry = positions.reduce((s, p) => s + p.entryPrice, 0) / positions.length;
                       const isLong = positions[0].direction === "long";
-                      onUpdateAllTP(Math.round((isLong ? avgEntry + 20 : avgEntry - 20) * 10) / 10);
+                      onUpdateAllTP(Math.round((isLong ? avgEntry + slDistance : avgEntry - slDistance) * 100) / 100);
                     }
                   }}
                   className="text-[7px] px-1 py-0.5 rounded transition-colors"
@@ -201,9 +205,9 @@ export default function OrderPanel({
                           onUpdatePositionSL(p.id, null);
                         } else {
                           const sl = p.direction === "long"
-                            ? p.entryPrice - 20
-                            : p.entryPrice + 20;
-                          onUpdatePositionSL(p.id, Math.round(sl * 10) / 10);
+                            ? p.entryPrice - slDistance
+                            : p.entryPrice + slDistance;
+                          onUpdatePositionSL(p.id, Math.round(sl * 100) / 100);
                         }
                       }}
                       className="text-[8px] px-1.5 py-0.5 rounded transition-colors"
@@ -211,7 +215,7 @@ export default function OrderPanel({
                         color: p.stopLoss != null ? "#0d1117" : "var(--red)",
                         background: p.stopLoss != null ? "var(--red)" : "transparent",
                       }}
-                      title={p.stopLoss != null ? `SL @ ${p.stopLoss.toFixed(1)} (click to remove)` : "Add SL (20pts, drag to adjust)"}
+                      title={p.stopLoss != null ? `SL @ ${p.stopLoss.toFixed(2)} (click to remove)` : `Add SL (${slDistance.toFixed(1)}pts = ½ ATR, drag to adjust)`}
                     >SL</button>
                     <button
                       onClick={() => {
@@ -219,9 +223,9 @@ export default function OrderPanel({
                           onUpdatePositionTP(p.id, null);
                         } else {
                           const tp = p.direction === "long"
-                            ? p.entryPrice + 20
-                            : p.entryPrice - 20;
-                          onUpdatePositionTP(p.id, Math.round(tp * 10) / 10);
+                            ? p.entryPrice + slDistance
+                            : p.entryPrice - slDistance;
+                          onUpdatePositionTP(p.id, Math.round(tp * 100) / 100);
                         }
                       }}
                       className="text-[8px] px-1.5 py-0.5 rounded transition-colors"
@@ -229,7 +233,7 @@ export default function OrderPanel({
                         color: p.takeProfit != null ? "#0d1117" : "var(--green)",
                         background: p.takeProfit != null ? "var(--green)" : "transparent",
                       }}
-                      title={p.takeProfit != null ? `TP @ ${p.takeProfit.toFixed(1)} (click to remove)` : "Add TP (20pts, drag to adjust)"}
+                      title={p.takeProfit != null ? `TP @ ${p.takeProfit.toFixed(2)} (click to remove)` : `Add TP (${slDistance.toFixed(1)}pts = ½ ATR, drag to adjust)`}
                     >TP</button>
                     <button
                       onClick={() => onClosePosition(p.id)}
