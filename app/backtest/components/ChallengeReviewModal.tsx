@@ -14,126 +14,135 @@ interface Props {
 export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade }: Props) {
   const allTrades = challenge.allTrades;
 
-  // Group ALL trades by exit time
-  const tradeGroups = useMemo(() => {
-    const map = new Map<number, ClosedTrade[]>();
-    allTrades.forEach((t) => {
-      const key = t.exitTime;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(t);
-    });
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a - b)
-      .map(([exitTime, trades]) => ({ exitTime, trades }));
-  }, [allTrades]);
+  // Sort all trades chronologically by exit time, then entry time
+  const sortedTrades = useMemo(() =>
+    [...allTrades].sort((a, b) => a.exitTime - b.exitTime || a.entryTime - b.entryTime),
+    [allTrades]
+  );
 
-  // Review state per group
-  const [groupReviews, setGroupReviews] = useState<Map<number, { rating: number; tags: Set<ReviewTag>; customTags: string[]; idea: string; coherent: string; executionNotes: string }>>(
+  // One review per trade (chronological)
+  const [tradeReviews, setTradeReviews] = useState<Map<string, { rating: number; tags: Set<ReviewTag>; customTags: string[]; idea: string; coherent: string; executionNotes: string }>>(
     () => {
       const m = new Map();
-      tradeGroups.forEach((g) => {
-        m.set(g.exitTime, { rating: 3, tags: new Set(), customTags: [], idea: "", coherent: "", executionNotes: "" });
+      sortedTrades.forEach((t) => {
+        m.set(t.id, { rating: 3, tags: new Set(), customTags: [], idea: "", coherent: "", executionNotes: "" });
       });
       return m;
     }
   );
 
   const [step, setStep] = useState<"trades" | "summary">("trades");
-  const [currentGroupIdx, setCurrentGroupIdx] = useState(0);
+  const [currentIdx, setCurrentIdx] = useState(0);
   const [overallRating, setOverallRating] = useState(3);
   const [overallNotes, setOverallNotes] = useState("");
   const [customTagInput, setCustomTagInput] = useState("");
 
   const stats = useMemo(() => computeChallengeStats(allTrades), [allTrades]);
+  const currentTrade = sortedTrades[currentIdx];
+  const currentReview = currentTrade ? tradeReviews.get(currentTrade.id) : null;
 
-  // Focus chart
+  // Focus chart on current trade
   useEffect(() => {
-    if (step === "trades" && tradeGroups[currentGroupIdx]) {
-      const g = tradeGroups[currentGroupIdx];
-      const earliest = Math.min(...g.trades.map((t) => t.entryTime));
-      onFocusTrade(earliest, g.exitTime);
+    if (step === "trades" && currentTrade) {
+      onFocusTrade(currentTrade.entryTime, currentTrade.exitTime);
     }
-  }, [step, currentGroupIdx, tradeGroups, onFocusTrade]);
+  }, [step, currentIdx, currentTrade, onFocusTrade]);
 
-  const currentGroup = tradeGroups[currentGroupIdx];
-  const currentReview = currentGroup ? groupReviews.get(currentGroup.exitTime) : null;
-
-  const updateReview = useCallback((exitTime: number, patch: Partial<{ rating: number; tags: Set<ReviewTag>; customTags: string[]; idea: string; coherent: string; executionNotes: string }>) => {
-    setGroupReviews((prev) => {
+  const updateReview = useCallback((id: string, patch: Partial<{ rating: number; tags: Set<ReviewTag>; customTags: string[]; idea: string; coherent: string; executionNotes: string }>) => {
+    setTradeReviews((prev) => {
       const next = new Map(prev);
-      const existing = next.get(exitTime)!;
-      next.set(exitTime, { ...existing, ...patch });
+      const existing = next.get(id)!;
+      next.set(id, { ...existing, ...patch });
       return next;
     });
   }, []);
 
-  const toggleTag = useCallback((exitTime: number, tag: ReviewTag) => {
-    setGroupReviews((prev) => {
+  const toggleTag = useCallback((id: string, tag: ReviewTag) => {
+    setTradeReviews((prev) => {
       const next = new Map(prev);
-      const existing = next.get(exitTime)!;
+      const existing = next.get(id)!;
       const tags = new Set(existing.tags);
       if (tags.has(tag)) tags.delete(tag);
       else tags.add(tag);
-      next.set(exitTime, { ...existing, tags });
+      next.set(id, { ...existing, tags });
       return next;
     });
   }, []);
 
-  const addCustomTag = useCallback((exitTime: number, tag: string) => {
+  const addCustomTag = useCallback((id: string, tag: string) => {
     if (!tag.trim()) return;
-    setGroupReviews((prev) => {
+    setTradeReviews((prev) => {
       const next = new Map(prev);
-      const existing = next.get(exitTime)!;
+      const existing = next.get(id)!;
       if (existing.customTags.includes(tag.trim())) return prev;
-      next.set(exitTime, { ...existing, customTags: [...existing.customTags, tag.trim()] });
+      next.set(id, { ...existing, customTags: [...existing.customTags, tag.trim()] });
       return next;
     });
     setCustomTagInput("");
   }, []);
 
-  const removeCustomTag = useCallback((exitTime: number, tag: string) => {
-    setGroupReviews((prev) => {
+  const removeCustomTag = useCallback((id: string, tag: string) => {
+    setTradeReviews((prev) => {
       const next = new Map(prev);
-      const existing = next.get(exitTime)!;
-      next.set(exitTime, { ...existing, customTags: existing.customTags.filter((t) => t !== tag) });
+      const existing = next.get(id)!;
+      next.set(id, { ...existing, customTags: existing.customTags.filter((t) => t !== tag) });
       return next;
     });
   }, []);
 
   const handleNext = useCallback(() => {
     if (step === "trades") {
-      if (currentGroupIdx < tradeGroups.length - 1) {
-        setCurrentGroupIdx((i) => i + 1);
-      } else {
-        setStep("summary");
-      }
+      if (currentIdx < sortedTrades.length - 1) setCurrentIdx((i) => i + 1);
+      else setStep("summary");
     }
-  }, [step, currentGroupIdx, tradeGroups.length]);
+  }, [step, currentIdx, sortedTrades.length]);
 
   const handlePrev = useCallback(() => {
-    if (step === "summary") {
-      setStep("trades");
-      setCurrentGroupIdx(tradeGroups.length - 1);
-    } else if (currentGroupIdx > 0) {
-      setCurrentGroupIdx((i) => i - 1);
-    }
-  }, [step, currentGroupIdx, tradeGroups.length]);
+    if (step === "summary") { setStep("trades"); setCurrentIdx(sortedTrades.length - 1); }
+    else if (currentIdx > 0) setCurrentIdx((i) => i - 1);
+  }, [step, currentIdx, sortedTrades.length]);
 
+  // Build review for PDF — group by exit time for the PDF format
   const buildReview = useCallback((): ChallengeReview => {
-    const tradeGroupReviews: TradeGroupReview[] = tradeGroups.map((g) => {
-      const r = groupReviews.get(g.exitTime)!;
-      return {
-        exitTime: g.exitTime,
-        exitPrice: g.trades[0].exitPrice,
-        trades: g.trades,
-        rating: r.rating,
-        tags: Array.from(r.tags),
-        customTags: r.customTags,
-        idea: r.idea,
-        coherent: r.coherent,
-        executionNotes: r.executionNotes,
-      };
+    // Group trades by exit time for the PDF trade group format
+    const exitGroups = new Map<number, ClosedTrade[]>();
+    sortedTrades.forEach((t) => {
+      if (!exitGroups.has(t.exitTime)) exitGroups.set(t.exitTime, []);
+      exitGroups.get(t.exitTime)!.push(t);
     });
+
+    const tradeGroupReviews: TradeGroupReview[] = Array.from(exitGroups.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([exitTime, trades]) => {
+        // Merge reviews from individual trades
+        const merged = trades.map((t) => tradeReviews.get(t.id)!);
+        const allTags = new Set<ReviewTag>();
+        const allCustom: string[] = [];
+        const ideas: string[] = [];
+        const coherents: string[] = [];
+        const execs: string[] = [];
+        let totalRating = 0;
+        merged.forEach((r) => {
+          r.tags.forEach((t) => allTags.add(t));
+          allCustom.push(...r.customTags);
+          if (r.idea) ideas.push(r.idea);
+          if (r.coherent) coherents.push(r.coherent);
+          if (r.executionNotes) execs.push(r.executionNotes);
+          totalRating += r.rating;
+        });
+        return {
+          exitTime,
+          exitPrice: trades[0].exitPrice,
+          trades,
+          rating: Math.round(totalRating / merged.length),
+          tags: Array.from(allTags),
+          customTags: [...new Set(allCustom)],
+          idea: ideas.join(" | "),
+          coherent: coherents.join(" | "),
+          executionNotes: execs.join(" | "),
+        };
+      });
+
     return {
       challenge,
       tradeGroupReviews,
@@ -142,7 +151,7 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
       stats,
       submittedAt: Date.now(),
     };
-  }, [tradeGroups, groupReviews, challenge, overallRating, overallNotes, stats]);
+  }, [sortedTrades, tradeReviews, challenge, overallRating, overallNotes, stats]);
 
   const handleDownloadPdf = useCallback(async () => {
     const review = buildReview();
@@ -158,32 +167,22 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  const groupPnl = currentGroup
-    ? currentGroup.trades.reduce((s, t) => s + t.pnlPoints, 0)
-    : 0;
-
-  // Equity curve data for summary
+  // Equity curve
   const equityPts = useMemo(() => {
     const pts: number[] = [0];
     let eq = 0;
-    for (const t of allTrades) {
-      eq += t.pnlPoints;
-      pts.push(eq);
-    }
+    for (const t of sortedTrades) { eq += t.pnlPoints; pts.push(eq); }
     return pts;
-  }, [allTrades]);
+  }, [sortedTrades]);
 
   return (
-    <div className="fixed inset-y-0 right-0 z-[100] slide-in-right" style={{ width: "440px" }}>
-      <div
-        className="w-full h-full flex flex-col overflow-hidden"
-        style={{
-          background: "linear-gradient(160deg, rgba(12, 15, 21, 0.98), rgba(18, 22, 30, 0.95))",
-          backdropFilter: "blur(32px) saturate(1.4)",
-          borderLeft: "1px solid rgba(255, 255, 255, 0.10)",
-          boxShadow: "-8px 0 64px rgba(0,0,0,0.6)",
-        }}
-      >
+    <div className="fixed inset-y-0 right-0 z-[100] slide-in-right" style={{ width: "460px" }}>
+      <div className="w-full h-full flex flex-col overflow-hidden" style={{
+        background: "linear-gradient(160deg, rgba(12, 15, 21, 0.98), rgba(18, 22, 30, 0.95))",
+        backdropFilter: "blur(32px) saturate(1.4)",
+        borderLeft: "1px solid rgba(255, 255, 255, 0.10)",
+        boxShadow: "-8px 0 64px rgba(0,0,0,0.6)",
+      }}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 py-3 flex-shrink-0" style={{
           background: "linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%)",
@@ -196,124 +195,117 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
           </div>
           <div className="w-px h-4" style={{ background: "rgba(255,255,255,0.1)" }} />
           <span className="font-display text-[11px] font-semibold uppercase tracking-[0.15em]" style={{ color: "rgba(255, 255, 255, 0.7)" }}>
-            Challenge {challenge.target} Review
+            Challenge {challenge.target}
           </span>
           <div className="ml-auto flex items-center gap-2">
-            <div className="flex gap-0.5">
-              {tradeGroups.map((_, i) => (
-                <div
-                  key={i}
-                  className="w-1.5 h-1.5 rounded-full transition-colors cursor-pointer"
-                  style={{
-                    background: step === "trades" && i === currentGroupIdx
-                      ? "rgba(255,255,255,0.9)"
-                      : i < currentGroupIdx || step === "summary"
-                        ? "rgba(255,255,255,0.35)"
-                        : "rgba(255,255,255,0.1)",
-                  }}
-                  onClick={() => { setStep("trades"); setCurrentGroupIdx(i); }}
-                />
-              ))}
-              <div
-                className="w-1.5 h-1.5 rounded-full transition-colors cursor-pointer"
-                style={{ background: step === "summary" ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.1)" }}
-                onClick={() => setStep("summary")}
-              />
-            </div>
-            <span className="text-[9px]" style={{ color: "rgba(255,255,255,0.4)" }}>
-              {step === "trades" ? `${currentGroupIdx + 1}/${tradeGroups.length}` : "Summary"}
-            </span>
+            {step === "trades" && (
+              <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
+                Trade {currentIdx + 1} of {sortedTrades.length}
+              </span>
+            )}
+            {step === "summary" && (
+              <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>Summary</span>
+            )}
           </div>
         </div>
 
+        {/* Progress bar */}
+        <div className="h-1 flex-shrink-0" style={{ background: "rgba(255,255,255,0.05)" }}>
+          <div className="h-full transition-all" style={{
+            width: step === "summary" ? "100%" : `${((currentIdx + 1) / sortedTrades.length) * 100}%`,
+            background: "rgba(255,255,255,0.3)",
+          }} />
+        </div>
+
         {/* Body */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-          {step === "trades" && currentGroup && currentReview && (
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {step === "trades" && currentTrade && currentReview && (
             <>
-              <div className="flex items-center gap-3">
-                <div className="text-[12px] font-mono font-bold px-2.5 py-1 rounded" style={{
-                  background: groupPnl >= 0 ? "rgba(63,185,80,0.12)" : "rgba(248,81,73,0.12)",
-                  border: `1px solid ${groupPnl >= 0 ? "rgba(63,185,80,0.25)" : "rgba(248,81,73,0.25)"}`,
-                  color: groupPnl >= 0 ? "#3fb950" : "#f85149",
-                }}>
-                  {groupPnl >= 0 ? "+" : ""}${groupPnl.toFixed(2)}
+              {/* Trade header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] font-mono font-bold" style={{
+                    color: currentTrade.direction === "long" ? "#3fb950" : "#f85149",
+                  }}>
+                    {currentTrade.direction === "long" ? "LONG" : "SHORT"}
+                  </span>
+                  <span className="text-[12px] font-mono" style={{ color: "rgba(255,255,255,0.6)" }}>
+                    {currentTrade.entryPrice.toFixed(1)} → {currentTrade.exitPrice.toFixed(1)}
+                  </span>
                 </div>
-                <span className="text-[11px]" style={{ color: "rgba(255,255,255,0.5)" }}>
-                  {currentGroup.trades.length} {currentGroup.trades.length === 1 ? "entry" : "entries"}
-                </span>
+                <div className="text-[14px] font-mono font-bold" style={{
+                  color: currentTrade.pnlPoints >= 0 ? "#3fb950" : "#f85149",
+                }}>
+                  {currentTrade.pnlPoints >= 0 ? "+" : ""}${currentTrade.pnlPoints.toFixed(2)}
+                </div>
               </div>
 
-              {/* Trades table */}
-              <div className="rounded-md overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-                <table className="w-full text-[11px] font-mono">
-                  <thead>
-                    <tr style={{ background: "rgba(255,255,255,0.04)" }}>
-                      <th className="text-left px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Dir</th>
-                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Entry</th>
-                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Exit</th>
-                      <th className="text-right px-3 py-2 font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>P&L</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {currentGroup.trades.map((t) => (
-                      <tr key={t.id} style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
-                        <td className="px-3 py-2" style={{ color: t.direction === "long" ? "#3fb950" : "#f85149" }}>
-                          {t.direction === "long" ? "L" : "S"}
-                        </td>
-                        <td className="text-right px-3 py-2" style={{ color: "rgba(255,255,255,0.85)" }}>{t.entryPrice.toFixed(1)}</td>
-                        <td className="text-right px-3 py-2" style={{ color: "rgba(255,255,255,0.85)" }}>{t.exitPrice.toFixed(1)}</td>
-                        <td className="text-right px-3 py-2 font-semibold" style={{ color: t.pnlPoints >= 0 ? "#3fb950" : "#f85149" }}>
-                          {t.pnlPoints >= 0 ? "+" : ""}${t.pnlPoints.toFixed(2)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              {/* Exit reason badge */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded" style={{
+                  background: "rgba(255,255,255,0.05)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  color: "rgba(255,255,255,0.4)",
+                }}>{currentTrade.exitReason}</span>
               </div>
 
-              {/* Rating */}
+              {/* Rating — bigger */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Execution Rating</label>
-                <div className="flex gap-1.5 mt-1.5">
+                <label className="text-[11px] uppercase tracking-wider font-semibold block mb-2" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Execution Rating
+                </label>
+                <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => updateReview(currentGroup.exitTime, { rating: n })} className="text-[20px] transition-transform hover:scale-110"
-                      style={{ color: n <= currentReview.rating ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)" }}>★</button>
+                    <button key={n} onClick={() => updateReview(currentTrade.id, { rating: n })}
+                      className="text-[24px] transition-transform hover:scale-110"
+                      style={{ color: n <= currentReview.rating ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)" }}>
+                      ★
+                    </button>
                   ))}
                 </div>
               </div>
 
               {/* Tags */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Tags</label>
-                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                <label className="text-[11px] uppercase tracking-wider font-semibold block mb-2" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Tags
+                </label>
+                <div className="flex flex-wrap gap-2">
                   {REVIEW_TAGS.map((tag) => (
-                    <button key={tag} onClick={() => toggleTag(currentGroup.exitTime, tag)}
-                      className="text-[10px] font-mono px-2.5 py-1 rounded-full transition-colors"
+                    <button key={tag} onClick={() => toggleTag(currentTrade.id, tag)}
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-full transition-colors"
                       style={{
-                        background: currentReview.tags.has(tag) ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.03)",
-                        border: `1px solid ${currentReview.tags.has(tag) ? "rgba(255,255,255,0.30)" : "rgba(255,255,255,0.08)"}`,
-                        color: currentReview.tags.has(tag) ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.4)",
+                        background: currentReview.tags.has(tag) ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.03)",
+                        border: `1px solid ${currentReview.tags.has(tag) ? "rgba(255,255,255,0.35)" : "rgba(255,255,255,0.08)"}`,
+                        color: currentReview.tags.has(tag) ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.4)",
                       }}>{tag}</button>
                   ))}
                   {currentReview.customTags.map((tag) => (
-                    <button key={tag} onClick={() => removeCustomTag(currentGroup.exitTime, tag)}
-                      className="text-[10px] font-mono px-2.5 py-1 rounded-full"
-                      style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.85)" }}>
+                    <button key={tag} onClick={() => removeCustomTag(currentTrade.id, tag)}
+                      className="text-[11px] font-mono px-3 py-1.5 rounded-full"
+                      style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.3)", color: "rgba(255,255,255,0.9)" }}>
                       {tag} ×
                     </button>
                   ))}
                   <input type="text" value={customTagInput} onChange={(e) => setCustomTagInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") addCustomTag(currentGroup.exitTime, customTagInput); }}
-                    placeholder="+ custom" className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-transparent outline-none w-20"
+                    onKeyDown={(e) => { if (e.key === "Enter") addCustomTag(currentTrade.id, customTagInput); }}
+                    placeholder="+ custom tag"
+                    className="text-[11px] font-mono px-3 py-1.5 rounded-full bg-transparent outline-none w-24"
                     style={{ border: "1px dashed rgba(255,255,255,0.15)", color: "rgba(255,255,255,0.5)" }} />
                 </div>
               </div>
 
-              {/* Notes */}
-              <div className="space-y-3">
-                <Field label="What was the idea?" value={currentReview.idea} onChange={(v) => updateReview(currentGroup.exitTime, { idea: v })} placeholder="Setup or signal..." />
-                <Field label="Coherent with plan?" value={currentReview.coherent} onChange={(v) => updateReview(currentGroup.exitTime, { coherent: v })} placeholder="Strategy alignment..." />
-                <Field label="Execution notes" value={currentReview.executionNotes} onChange={(v) => updateReview(currentGroup.exitTime, { executionNotes: v })} placeholder="Timing, sizing..." />
+              {/* Notes — large, prominent text areas */}
+              <div className="space-y-4">
+                <NoteField label="What was the idea?" value={currentReview.idea}
+                  onChange={(v) => updateReview(currentTrade.id, { idea: v })}
+                  placeholder="What setup or signal triggered this trade..." />
+                <NoteField label="Was it coherent with your plan?" value={currentReview.coherent}
+                  onChange={(v) => updateReview(currentTrade.id, { coherent: v })}
+                  placeholder="Did this match your strategy rules..." />
+                <NoteField label="Execution notes" value={currentReview.executionNotes}
+                  onChange={(v) => updateReview(currentTrade.id, { executionNotes: v })}
+                  placeholder="Entry timing, sizing, management..." />
               </div>
             </>
           )}
@@ -321,9 +313,9 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
           {step === "summary" && (
             <>
               <div className="text-center space-y-1">
-                <p className="text-[14px] font-semibold" style={{ color: "rgba(255,255,255,0.9)" }}>Challenge Complete</p>
-                <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.45)" }}>
-                  {stats.daysPlayed} days | {stats.totalExits} exits | {stats.totalTrades} trades
+                <p className="text-[16px] font-semibold" style={{ color: "rgba(255,255,255,0.95)" }}>Challenge Complete</p>
+                <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.45)" }}>
+                  {stats.daysPlayed} days — {stats.totalExits} exits — {stats.totalTrades} trades
                 </p>
               </div>
 
@@ -337,18 +329,20 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
                   { label: "Avg Loss", value: `$${stats.avgLoss.toFixed(2)}`, color: "#f85149" },
                   { label: "Max DD", value: `$${stats.maxDrawdown.toFixed(2)}`, color: "#f85149" },
                 ].map((s) => (
-                  <div key={s.label} className="text-center py-2.5 rounded-md" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
-                    <div className="text-[13px] font-mono font-bold" style={{ color: s.color }}>{s.value}</div>
-                    <div className="text-[8px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
+                  <div key={s.label} className="text-center py-3 rounded-md" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                    <div className="text-[14px] font-mono font-bold" style={{ color: s.color }}>{s.value}</div>
+                    <div className="text-[9px] uppercase tracking-wider" style={{ color: "rgba(255,255,255,0.35)" }}>{s.label}</div>
                   </div>
                 ))}
               </div>
 
-              {/* Mini equity curve */}
+              {/* Equity curve */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Equity Curve</label>
-                <div className="mt-1.5 rounded-md overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
-                  <svg viewBox={`0 0 ${equityPts.length} 40`} className="w-full h-16" preserveAspectRatio="none">
+                <label className="text-[11px] uppercase tracking-wider font-semibold block mb-2" style={{ color: "rgba(255,255,255,0.5)" }}>
+                  Equity Curve
+                </label>
+                <div className="rounded-md overflow-hidden" style={{ border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.02)" }}>
+                  <svg viewBox={`0 0 ${equityPts.length} 40`} className="w-full h-20" preserveAspectRatio="none">
                     {(() => {
                       const mn = Math.min(...equityPts);
                       const mx = Math.max(...equityPts);
@@ -368,16 +362,19 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
 
               {/* Overall rating */}
               <div>
-                <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>Overall Rating</label>
-                <div className="flex gap-1.5 mt-1.5">
+                <label className="text-[11px] uppercase tracking-wider font-semibold block mb-2" style={{ color: "rgba(255,255,255,0.6)" }}>
+                  Overall Rating
+                </label>
+                <div className="flex gap-2">
                   {[1, 2, 3, 4, 5].map((n) => (
-                    <button key={n} onClick={() => setOverallRating(n)} className="text-[24px] transition-transform hover:scale-110"
+                    <button key={n} onClick={() => setOverallRating(n)} className="text-[28px] transition-transform hover:scale-110"
                       style={{ color: n <= overallRating ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.12)" }}>★</button>
                   ))}
                 </div>
               </div>
 
-              <Field label="Overall notes & takeaways" value={overallNotes} onChange={setOverallNotes} placeholder="Key learnings from this challenge..." rows={3} />
+              <NoteField label="Overall notes & takeaways" value={overallNotes} onChange={setOverallNotes}
+                placeholder="Key learnings from this challenge..." rows={4} />
             </>
           )}
         </div>
@@ -387,27 +384,27 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
           borderTop: "1px solid rgba(255, 255, 255, 0.06)",
           background: "rgba(0,0,0,0.2)",
         }}>
-          <button onClick={handlePrev} disabled={step === "trades" && currentGroupIdx === 0}
-            className="text-[10px] font-mono px-3 py-1.5 rounded transition-colors disabled:opacity-20"
+          <button onClick={handlePrev} disabled={step === "trades" && currentIdx === 0}
+            className="text-[11px] font-mono px-4 py-2 rounded transition-colors disabled:opacity-20"
             style={{ background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.6)", border: "1px solid rgba(255,255,255,0.1)" }}>
-            Previous
+            Prev
           </button>
 
           <div className="flex-1" />
 
           {step === "summary" && (
             <button onClick={handleDownloadPdf}
-              className="text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
-              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)" }}>
+              className="text-[11px] font-mono font-semibold px-5 py-2 rounded transition-colors hover:brightness-110"
+              style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.95)" }}>
               Download PDF
             </button>
           )}
 
           {step === "trades" && (
             <button onClick={handleNext}
-              className="text-[11px] font-mono font-semibold px-4 py-1.5 rounded transition-colors"
-              style={{ background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.9)" }}>
-              {currentGroupIdx < tradeGroups.length - 1 ? "Next Trade" : "Summary"}
+              className="text-[11px] font-mono font-semibold px-5 py-2 rounded transition-colors hover:brightness-110"
+              style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.95)" }}>
+              {currentIdx < sortedTrades.length - 1 ? "Next" : "Summary"}
             </button>
           )}
         </div>
@@ -416,15 +413,27 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
   );
 }
 
-function Field({ label, value, onChange, placeholder, rows = 2 }: { label: string; value: string; onChange: (v: string) => void; placeholder: string; rows?: number }) {
+function NoteField({ label, value, onChange, placeholder, rows = 3 }: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  rows?: number;
+}) {
   return (
     <div>
-      <label className="text-[10px] uppercase tracking-wider font-semibold" style={{ color: "rgba(255,255,255,0.5)" }}>{label}</label>
+      <label className="text-[11px] uppercase tracking-wider font-semibold block mb-2" style={{ color: "rgba(255,255,255,0.6)" }}>
+        {label}
+      </label>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} rows={rows}
-        className="w-full mt-1.5 text-[11px] font-mono px-3 py-2 rounded-md bg-transparent outline-none resize-none"
-        style={{ border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.85)", background: "rgba(255,255,255,0.02)" }}
-        onFocus={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.25)"; }}
-        onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.10)"; }} />
+        className="w-full text-[12px] font-mono px-4 py-3 rounded-lg bg-transparent outline-none resize-none leading-relaxed"
+        style={{
+          border: "1px solid rgba(255,255,255,0.12)",
+          color: "rgba(255,255,255,0.9)",
+          background: "rgba(255,255,255,0.03)",
+        }}
+        onFocus={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.3)"; e.target.style.background = "rgba(255,255,255,0.05)"; }}
+        onBlur={(e) => { e.target.style.borderColor = "rgba(255,255,255,0.12)"; e.target.style.background = "rgba(255,255,255,0.03)"; }} />
     </div>
   );
 }

@@ -334,11 +334,44 @@ export default function BacktestPage() {
     }
   }, [currentDay, revealedBarCount, dayComplete, tradingSize]);
 
-  // Challenge: record day when complete, check if challenge target reached
+  // Challenge: track exits in real-time, complete immediately when target reached
+  const prevClosedTradesLenRef = useRef(0);
+  useEffect(() => {
+    if (!challenge || challenge.complete) return;
+    if (closedTrades.length === 0 || closedTrades.length === prevClosedTradesLenRef.current) return;
+    prevClosedTradesLenRef.current = closedTrades.length;
+
+    // Count current day's exit events
+    const dayExits = countExitEvents(closedTrades);
+    const totalExits = challenge.totalExits + dayExits;
+
+    if (totalExits >= challenge.target) {
+      // Challenge target reached mid-day — stop immediately
+      const updatedChallenge: ChallengeState = {
+        ...challenge,
+        days: [...challenge.days, {
+          date: currentDay!.date,
+          dayName: currentDay!.dayName,
+          changePercent: currentDay!.changePercent,
+          rangePercent: currentDay!.rangePercent,
+          trades: closedTrades,
+          exitCount: dayExits,
+        }],
+        allTrades: [...challenge.allTrades, ...closedTrades],
+        totalExits,
+        complete: true,
+      };
+      setChallenge(updatedChallenge);
+      saveChallenge(updatedChallenge);
+      setDayComplete(true);
+      setShowChallengeReview(true);
+    }
+  }, [closedTrades, challenge, currentDay]);
+
+  // Challenge: record day on day complete (only if challenge not already completed mid-day)
   const challengeDayRecordedRef = useRef(false);
   useEffect(() => {
     if (!dayComplete || !challenge || challenge.complete || challengeDayRecordedRef.current) return;
-    // Use a short delay so closedTrades state is settled
     const timer = setTimeout(() => {
       setClosedTrades((currentDayTrades) => {
         if (currentDayTrades.length > 0) {
@@ -355,16 +388,12 @@ export default function BacktestPage() {
             }],
             allTrades: [...challenge.allTrades, ...currentDayTrades],
             totalExits: challenge.totalExits + exitCount,
-            complete: challenge.totalExits + exitCount >= challenge.target,
+            complete: false,
           };
           setChallenge(updatedChallenge);
           saveChallenge(updatedChallenge);
-
-          if (updatedChallenge.complete) {
-            setShowChallengeReview(true);
-          }
         }
-        return currentDayTrades; // don't modify
+        return currentDayTrades;
       });
       challengeDayRecordedRef.current = true;
     }, 100);
