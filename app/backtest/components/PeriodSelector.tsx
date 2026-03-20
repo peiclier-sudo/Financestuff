@@ -5,7 +5,9 @@ import { TradingDay } from "@/lib/types";
 
 interface Props {
   allDays: TradingDay[];
+  instrumentLabel?: string;
   onConfirm: (dateFrom: string, dateTo: string) => void;
+  onBack?: () => void;
 }
 
 // Preset periods
@@ -20,7 +22,7 @@ const PRESETS = [
   { label: "Last 5 Years", from: null, to: null, lastYears: 5 },
 ] as const;
 
-export default function PeriodSelector({ allDays, onConfirm }: Props) {
+export default function PeriodSelector({ allDays, instrumentLabel, onConfirm, onBack }: Props) {
   const firstDate = allDays[0]?.date ?? "2015-01-01";
   const lastDate = allDays[allDays.length - 1]?.date ?? "2025-12-31";
 
@@ -144,11 +146,20 @@ export default function PeriodSelector({ allDays, onConfirm }: Props) {
       <div className="w-full max-w-3xl px-8">
         {/* Header */}
         <div className="text-center mb-8">
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="text-[10px] mb-3 transition-colors hover:text-white inline-block"
+              style={{ color: "rgba(255,255,255,0.3)" }}
+            >
+              &larr; Change instrument
+            </button>
+          )}
           <h1 className="font-display text-xl font-bold tracking-tight mb-2" style={{ color: "rgba(255,255,255,0.95)" }}>
-            Select Data Period
+            {instrumentLabel ? `${instrumentLabel} — ` : ""}Select Data Period
           </h1>
           <p className="text-[12px]" style={{ color: "rgba(255,255,255,0.4)" }}>
-            Choose the NASDAQ date range to trade on
+            Choose the {instrumentLabel ?? "data"} date range to trade on
           </p>
         </div>
 
