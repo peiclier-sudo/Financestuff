@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import Link from "next/link";
 import { TradingDay } from "@/lib/types";
 import { parseCSV, groupIntoDays } from "@/lib/dataUtils";
@@ -24,7 +24,16 @@ import HourlyStats from "./components/HourlyStats";
 import OrderPanel from "./components/OrderPanel";
 import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayReviewModal from "./components/DayReviewModal";
+import ChallengeReviewModal from "./components/ChallengeReviewModal";
 import DayPoolFilter from "./components/DayPoolFilter";
+import {
+  ChallengeState,
+  ChallengeTarget,
+  saveChallenge,
+  loadChallenge,
+  clearChallenge,
+  countExitEvents,
+} from "@/lib/challengeTypes";
 
 let idCounter = 0;
 function genId() {
@@ -58,6 +67,17 @@ export default function BacktestPage() {
   // Day review
   const [showReview, setShowReview] = useState(false);
   const [reviewFocusRange, setReviewFocusRange] = useState<{ entryTime: number; exitTime: number } | null>(null);
+
+  // Challenge mode
+  const [challenge, setChallenge] = useState<ChallengeState | null>(null);
+  const [showChallengeReview, setShowChallengeReview] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+
+  // Load challenge from localStorage on mount
+  useEffect(() => {
+    const saved = loadChallenge();
+    if (saved && !saved.complete) setChallenge(saved);
+  }, []);
 
   // Pool filter
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
@@ -129,6 +149,41 @@ export default function BacktestPage() {
     setPositions([]);
     setClosedTrades([]);
   }, [dayPool]);
+
+  // Start a challenge
+  const startChallenge = useCallback((target: ChallengeTarget) => {
+    const state: ChallengeState = {
+      id: `ch_${Date.now()}`,
+      target,
+      startedAt: Date.now(),
+      tradingSize,
+      days: [],
+      allTrades: [],
+      totalExits: 0,
+      complete: false,
+    };
+    setChallenge(state);
+    saveChallenge(state);
+    setSessionTrades([]);
+    // Start first day
+    const day = pickRandomDay(dayPool);
+    if (day) {
+      setCurrentDay(day);
+      setRevealedBarCount(1);
+      setDayComplete(false);
+      setOrders([]);
+      setPositions([]);
+      setClosedTrades([]);
+    }
+  }, [dayPool, tradingSize]);
+
+  // Quit challenge
+  const quitChallenge = useCallback(() => {
+    clearChallenge();
+    setChallenge(null);
+    setShowQuitConfirm(false);
+    setSessionTrades([]);
+  }, []);
 
   // Advance one bar
   const advanceBar = useCallback(() => {
@@ -278,6 +333,62 @@ export default function BacktestPage() {
       setDayComplete(true);
     }
   }, [currentDay, revealedBarCount, dayComplete, tradingSize]);
+
+  // Challenge: record day when complete, check if challenge target reached
+  const challengeDayRecordedRef = useRef(false);
+  useEffect(() => {
+    if (!dayComplete || !challenge || challenge.complete || challengeDayRecordedRef.current) return;
+    // Use a short delay so closedTrades state is settled
+    const timer = setTimeout(() => {
+      setClosedTrades((currentDayTrades) => {
+        if (currentDayTrades.length > 0) {
+          const exitCount = countExitEvents(currentDayTrades);
+          const updatedChallenge: ChallengeState = {
+            ...challenge,
+            days: [...challenge.days, {
+              date: currentDay!.date,
+              dayName: currentDay!.dayName,
+              changePercent: currentDay!.changePercent,
+              rangePercent: currentDay!.rangePercent,
+              trades: currentDayTrades,
+              exitCount,
+            }],
+            allTrades: [...challenge.allTrades, ...currentDayTrades],
+            totalExits: challenge.totalExits + exitCount,
+            complete: challenge.totalExits + exitCount >= challenge.target,
+          };
+          setChallenge(updatedChallenge);
+          saveChallenge(updatedChallenge);
+
+          if (updatedChallenge.complete) {
+            setShowChallengeReview(true);
+          }
+        }
+        return currentDayTrades; // don't modify
+      });
+      challengeDayRecordedRef.current = true;
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [dayComplete, challenge, currentDay]);
+
+  // Reset the recorded flag when day changes
+  useEffect(() => {
+    challengeDayRecordedRef.current = false;
+  }, [currentDay?.date]);
+
+  // Challenge: auto-advance to next day (only if not complete, not reviewing)
+  const challengeNextDay = useCallback(() => {
+    if (!challenge || challenge.complete) return;
+    const day = pickRandomDay(dayPool);
+    if (day) {
+      setCurrentDay(day);
+      setRevealedBarCount(1);
+      setDayComplete(false);
+      setOrders([]);
+      setPositions([]);
+      setClosedTrades([]);
+    }
+  }, [challenge, dayPool]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -481,9 +592,53 @@ export default function BacktestPage() {
 
         <div className="w-px h-4 bg-[var(--border)]" />
 
-        <button onClick={newRandomDay} className="btn-primary text-[10px] py-1 px-3">
-          New Random Day
-        </button>
+        {!challenge ? (
+          <>
+            <button onClick={newRandomDay} className="btn-primary text-[10px] py-1 px-3">
+              New Random Day
+            </button>
+            <div className="flex items-center gap-1">
+              <button onClick={() => startChallenge(15)}
+                className="text-[10px] py-1 px-2 rounded transition-colors text-[var(--text-dim)] hover:text-white hover:bg-white/10">
+                Challenge 15
+              </button>
+              <button onClick={() => startChallenge(30)}
+                className="text-[10px] py-1 px-2 rounded transition-colors text-[var(--text-dim)] hover:text-white hover:bg-white/10">
+                Challenge 30
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            {/* Challenge progress bar */}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                CHALLENGE {challenge.target}
+              </span>
+              <div className="w-24 h-1.5 rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.1)" }}>
+                <div className="h-full rounded-full transition-all" style={{
+                  width: `${Math.min(100, (challenge.totalExits / challenge.target) * 100)}%`,
+                  background: "rgba(255,255,255,0.7)",
+                }} />
+              </div>
+              <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
+                {challenge.totalExits}/{challenge.target}
+              </span>
+              <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.35)" }}>
+                Day {challenge.days.length + (dayComplete ? 0 : 1)}
+              </span>
+            </div>
+            {dayComplete && !challenge.complete && (
+              <button onClick={challengeNextDay} className="btn-primary text-[10px] py-1 px-3">
+                Next Day
+              </button>
+            )}
+            <button onClick={() => setShowQuitConfirm(true)}
+              className="text-[9px] py-0.5 px-2 rounded transition-colors text-[var(--text-dim)] hover:text-[#f85149]">
+              Quit
+            </button>
+          </>
+        )}
 
         <button
           onClick={() => setShowFilter((f) => !f)}
@@ -504,17 +659,37 @@ export default function BacktestPage() {
           </>
         )}
 
-        {/* Session summary */}
+        {/* Session / Challenge summary */}
         <div className="ml-auto flex items-center gap-3 text-[10px]">
-          {sessionTrades.length > 0 && (
+          {challenge ? (
             <>
-              <span className="text-[var(--text-dim)]">
-                Session: {sessionTrades.length} trades
-                {sessionTrades.length > 0 && ` | ${((sessionWins / sessionTrades.length) * 100).toFixed(0)}% win`}
-              </span>
-              <span className="font-mono font-semibold" style={{ color: sessionPnl >= 0 ? "var(--green)" : "var(--red)" }}>
-                {sessionPnl >= 0 ? "+" : ""}${sessionPnl.toFixed(1)}
-              </span>
+              {challenge.allTrades.length > 0 && (() => {
+                const chPnl = challenge.allTrades.reduce((s, t) => s + t.pnlPoints, 0);
+                const chWins = challenge.allTrades.filter((t) => t.pnlPoints > 0).length;
+                return (
+                  <>
+                    <span className="text-[var(--text-dim)]">
+                      {challenge.allTrades.length} trades | {((chWins / challenge.allTrades.length) * 100).toFixed(0)}% win
+                    </span>
+                    <span className="font-mono font-semibold" style={{ color: chPnl >= 0 ? "var(--green)" : "var(--red)" }}>
+                      {chPnl >= 0 ? "+" : ""}${chPnl.toFixed(1)}
+                    </span>
+                  </>
+                );
+              })()}
+            </>
+          ) : (
+            <>
+              {sessionTrades.length > 0 && (
+                <>
+                  <span className="text-[var(--text-dim)]">
+                    Session: {sessionTrades.length} trades | {((sessionWins / sessionTrades.length) * 100).toFixed(0)}% win
+                  </span>
+                  <span className="font-mono font-semibold" style={{ color: sessionPnl >= 0 ? "var(--green)" : "var(--red)" }}>
+                    {sessionPnl >= 0 ? "+" : ""}${sessionPnl.toFixed(1)}
+                  </span>
+                </>
+              )}
             </>
           )}
           <span className="text-[var(--text-dim)]">
@@ -698,7 +873,7 @@ export default function BacktestPage() {
       )}
 
       {/* Day Review Modal */}
-      {showReview && currentDay && (
+      {showReview && currentDay && !challenge && (
         <DayReviewModal
           closedTrades={closedTrades}
           day={currentDay}
@@ -706,6 +881,49 @@ export default function BacktestPage() {
           onClose={() => { setShowReview(false); setReviewFocusRange(null); }}
           onFocusTrade={(entryTime, exitTime) => setReviewFocusRange({ entryTime, exitTime })}
         />
+      )}
+
+      {/* Challenge Review Modal */}
+      {showChallengeReview && challenge && challenge.complete && (
+        <ChallengeReviewModal
+          challenge={challenge}
+          onClose={() => {
+            setShowChallengeReview(false);
+            setReviewFocusRange(null);
+            clearChallenge();
+            setChallenge(null);
+            setSessionTrades([]);
+          }}
+          onFocusTrade={(entryTime, exitTime) => setReviewFocusRange({ entryTime, exitTime })}
+        />
+      )}
+
+      {/* Quit Challenge Confirmation */}
+      {showQuitConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
+          <div className="rounded-lg p-6 text-center max-w-sm" style={{
+            background: "rgba(12, 15, 21, 0.95)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            boxShadow: "0 8px 40px rgba(0,0,0,0.5)",
+          }}>
+            <p className="text-[13px] font-semibold mb-2" style={{ color: "rgba(255,255,255,0.9)" }}>Quit Challenge?</p>
+            <p className="text-[11px] mb-4" style={{ color: "rgba(255,255,255,0.5)" }}>
+              Your progress ({challenge?.totalExits}/{challenge?.target} trades) will be lost.
+            </p>
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => setShowQuitConfirm(false)}
+                className="text-[10px] font-mono px-4 py-1.5 rounded"
+                style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.6)" }}>
+                Cancel
+              </button>
+              <button onClick={quitChallenge}
+                className="text-[10px] font-mono font-semibold px-4 py-1.5 rounded"
+                style={{ background: "rgba(248,81,73,0.15)", border: "1px solid rgba(248,81,73,0.3)", color: "#f85149" }}>
+                Quit Challenge
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
