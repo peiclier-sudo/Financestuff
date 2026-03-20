@@ -26,6 +26,7 @@ import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayReviewModal from "./components/DayReviewModal";
 import ChallengeReviewModal from "./components/ChallengeReviewModal";
 import DayPoolFilter from "./components/DayPoolFilter";
+import PeriodSelector from "./components/PeriodSelector";
 import {
   ChallengeState,
   ChallengeTarget,
@@ -83,6 +84,9 @@ export default function BacktestPage() {
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
   const [showFilter, setShowFilter] = useState(false);
 
+  // Period selection
+  const [periodRange, setPeriodRange] = useState<{ from: string; to: string } | null>(null);
+
   // Load data
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -102,8 +106,14 @@ export default function BacktestPage() {
       });
   }, []);
 
-  // Filtered pool
-  const dayPool = useMemo(() => filterDayPool(allDays, poolFilter), [allDays, poolFilter]);
+  // Days filtered by selected period
+  const periodDays = useMemo(() => {
+    if (!periodRange) return allDays;
+    return allDays.filter((d) => d.date >= periodRange.from && d.date <= periodRange.to);
+  }, [allDays, periodRange]);
+
+  // Filtered pool (applies pool filter on top of period filter)
+  const dayPool = useMemo(() => filterDayPool(periodDays, poolFilter), [periodDays, poolFilter]);
 
   // Day signature stats (retroactive)
   const signatureStats: DaySignatureStats = useMemo(() => {
@@ -334,77 +344,38 @@ export default function BacktestPage() {
     }
   }, [currentDay, revealedBarCount, dayComplete, tradingSize]);
 
-  // Challenge: track exits in real-time, complete immediately when target reached
+  // Challenge: track exits in real-time, complete when target reached AND no open positions remain
   const prevClosedTradesLenRef = useRef(0);
   useEffect(() => {
     if (!challenge || challenge.complete) return;
-    if (closedTrades.length === 0 || closedTrades.length === prevClosedTradesLenRef.current) return;
-    prevClosedTradesLenRef.current = closedTrades.length;
+    if (closedTrades.length === 0) return;
 
     // Count current day's exit events
     const dayExits = countExitEvents(closedTrades);
     const totalExits = challenge.totalExits + dayExits;
 
-    if (totalExits >= challenge.target) {
-      // Challenge target reached — force-close any remaining open positions first
-      // so they are included in the review
-      setPositions((prev) => {
-        if (prev.length === 0) {
-          // No open positions, finalize immediately
-          finalizeChallengeCompletion(closedTrades, dayExits, totalExits);
-          return prev;
-        }
-        const currentBar = currentDay!.bars[revealedBarCount - 1];
-        const forceClosed: ClosedTrade[] = prev.map((pos) => {
-          const mult = pos.direction === "long" ? 1 : -1;
-          const pnlPoints = (currentBar.close - pos.entryPrice) * mult;
-          return {
-            id: genId(),
-            direction: pos.direction,
-            entryPrice: pos.entryPrice,
-            entryTime: pos.entryTime,
-            exitPrice: currentBar.close,
-            exitTime: currentBar.time,
-            pnlPoints: pnlPoints * tradingSize,
-            pnlPercent: (pnlPoints / pos.entryPrice) * 100,
-            exitReason: "manual" as const,
-          };
-        });
-        // Add force-closed trades to state
-        const allDayTrades = [...closedTrades, ...forceClosed];
-        setClosedTrades(allDayTrades);
-        setSessionTrades((st) => [...st, ...forceClosed]);
-
-        // Finalize with all trades included
-        const finalExits = countExitEvents(allDayTrades);
-        const finalTotalExits = challenge.totalExits + finalExits;
-        finalizeChallengeCompletion(allDayTrades, finalExits, finalTotalExits);
-        return []; // clear all positions
-      });
+    if (totalExits >= challenge.target && positions.length === 0) {
+      // Target reached AND all positions are closed — finalize challenge
+      const updatedChallenge: ChallengeState = {
+        ...challenge,
+        days: [...challenge.days, {
+          date: currentDay!.date,
+          dayName: currentDay!.dayName,
+          changePercent: currentDay!.changePercent,
+          rangePercent: currentDay!.rangePercent,
+          trades: closedTrades,
+          exitCount: dayExits,
+        }],
+        allTrades: [...challenge.allTrades, ...closedTrades],
+        totalExits,
+        complete: true,
+      };
+      setChallenge(updatedChallenge);
+      saveChallenge(updatedChallenge);
+      setDayComplete(true);
+      setShowChallengeReview(true);
     }
-  }, [closedTrades, challenge, currentDay, revealedBarCount, tradingSize]);
-
-  const finalizeChallengeCompletion = useCallback((dayTrades: ClosedTrade[], dayExits: number, totalExits: number) => {
-    if (!challenge || !currentDay) return;
-    const updatedChallenge: ChallengeState = {
-      ...challenge,
-      days: [...challenge.days, {
-        date: currentDay.date,
-        dayName: currentDay.dayName,
-        changePercent: currentDay.changePercent,
-        rangePercent: currentDay.rangePercent,
-        trades: dayTrades,
-        exitCount: dayExits,
-      }],
-      allTrades: [...challenge.allTrades, ...dayTrades],
-      totalExits,
-      complete: true,
-    };
-    setChallenge(updatedChallenge);
-    saveChallenge(updatedChallenge);
-    setDayComplete(true);
-    setShowChallengeReview(true);
-  }, [challenge, currentDay]);
+  }, [closedTrades, challenge, currentDay, positions.length]);
 
   // Challenge: record day on day complete (only if challenge not already completed mid-day)
   const challengeDayRecordedRef = useRef(false);
@@ -643,6 +614,16 @@ export default function BacktestPage() {
     );
   }
 
+  // Show period selector before trading starts
+  if (!periodRange) {
+    return (
+      <PeriodSelector
+        allDays={allDays}
+        onConfirm={(from, to) => setPeriodRange({ from, to })}
+      />
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Top Bar */}
@@ -650,6 +631,26 @@ export default function BacktestPage() {
         <Link href="/" className="text-[10px] text-[var(--text-dim)] hover:text-white transition-colors">
           &larr; Home
         </Link>
+        <div className="w-px h-4 bg-[var(--border)]" />
+
+        {/* Period indicator */}
+        {periodRange && !challenge && (
+          <button
+            onClick={() => {
+              setPeriodRange(null);
+              setCurrentDay(null);
+              setSessionTrades([]);
+            }}
+            className="text-[9px] font-mono px-2 py-0.5 rounded transition-colors hover:bg-white/10"
+            style={{ color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}
+            title="Change period"
+          >
+            {new Date(periodRange.from + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
+            {" – "}
+            {new Date(periodRange.to + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
+            {" "}({periodDays.length}d)
+          </button>
+        )}
         <div className="w-px h-4 bg-[var(--border)]" />
 
         <div className="flex items-center gap-2">

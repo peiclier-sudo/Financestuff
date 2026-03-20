@@ -694,11 +694,13 @@ export default function ReplayChart({
       return;
     }
 
-    // Gentle zoom — show the trade with generous context (roughly 40% of visible bars are context)
-    const tradeSpan = Math.max(exitIdx - entryIdx, 1);
-    const contextBars = Math.max(Math.round(tradeSpan * 1.2), 15);
-    const from = Math.max(0, entryIdx - contextBars);
-    const to = Math.min(revealedBars.length - 1, exitIdx + contextBars);
+    // Gentle scroll — center the trade in the current view without changing zoom level
+    // Only adjust the visible range to center on the trade, keeping the same number of visible bars
+    const currentRange = chart.timeScale().getVisibleLogicalRange();
+    const currentSpan = currentRange ? currentRange.to - currentRange.from : revealedBars.length;
+    const tradeCenter = (entryIdx + exitIdx) / 2;
+    const from = Math.max(0, Math.round(tradeCenter - currentSpan / 2));
+    const to = Math.min(revealedBars.length - 1, from + currentSpan);
     chart.timeScale().setVisibleLogicalRange({ from, to });
 
     // Compute highlight rect after zoom settles
