@@ -44,7 +44,7 @@ export interface Instrument {
 
 export const INSTRUMENTS: Instrument[] = [
   { id: "nasdaq", label: "NASDAQ", file: "/NASDAQ_5min_NDX_From_2015.csv" },
-  { id: "copper", label: "COPPER", file: "/__HG_5min_2020_Futures.csv" },
+  { id: "copper", label: "COPPER", file: "/HG_5min_2020_Futures.csv" },
 ];
 
 let idCounter = 0;
