@@ -26,6 +26,7 @@ import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayReviewModal from "./components/DayReviewModal";
 import ChallengeReviewModal from "./components/ChallengeReviewModal";
 import DayPoolFilter from "./components/DayPoolFilter";
+import PeriodSelector from "./components/PeriodSelector";
 import {
   ChallengeState,
   ChallengeTarget,
@@ -83,6 +84,9 @@ export default function BacktestPage() {
   const [poolFilter, setPoolFilter] = useState<PoolFilter>(DEFAULT_POOL_FILTER);
   const [showFilter, setShowFilter] = useState(false);
 
+  // Period selection
+  const [periodRange, setPeriodRange] = useState<{ from: string; to: string } | null>(null);
+
   // Load data
   useEffect(() => {
     fetch("/NASDAQ_5min_NDX_From_2015.csv")
@@ -102,8 +106,14 @@ export default function BacktestPage() {
       });
   }, []);
 
-  // Filtered pool
-  const dayPool = useMemo(() => filterDayPool(allDays, poolFilter), [allDays, poolFilter]);
+  // Days filtered by selected period
+  const periodDays = useMemo(() => {
+    if (!periodRange) return allDays;
+    return allDays.filter((d) => d.date >= periodRange.from && d.date <= periodRange.to);
+  }, [allDays, periodRange]);
+
+  // Filtered pool (applies pool filter on top of period filter)
+  const dayPool = useMemo(() => filterDayPool(periodDays, poolFilter), [periodDays, poolFilter]);
 
   // Day signature stats (retroactive)
   const signatureStats: DaySignatureStats = useMemo(() => {
@@ -604,6 +614,16 @@ export default function BacktestPage() {
     );
   }
 
+  // Show period selector before trading starts
+  if (!periodRange) {
+    return (
+      <PeriodSelector
+        allDays={allDays}
+        onConfirm={(from, to) => setPeriodRange({ from, to })}
+      />
+    );
+  }
+
   return (
     <div className="h-screen flex flex-col overflow-hidden">
       {/* Top Bar */}
@@ -611,6 +631,26 @@ export default function BacktestPage() {
         <Link href="/" className="text-[10px] text-[var(--text-dim)] hover:text-white transition-colors">
           &larr; Home
         </Link>
+        <div className="w-px h-4 bg-[var(--border)]" />
+
+        {/* Period indicator */}
+        {periodRange && !challenge && (
+          <button
+            onClick={() => {
+              setPeriodRange(null);
+              setCurrentDay(null);
+              setSessionTrades([]);
+            }}
+            className="text-[9px] font-mono px-2 py-0.5 rounded transition-colors hover:bg-white/10"
+            style={{ color: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.08)" }}
+            title="Change period"
+          >
+            {new Date(periodRange.from + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
+            {" – "}
+            {new Date(periodRange.to + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" })}
+            {" "}({periodDays.length}d)
+          </button>
+        )}
         <div className="w-px h-4 bg-[var(--border)]" />
 
         <div className="flex items-center gap-2">
