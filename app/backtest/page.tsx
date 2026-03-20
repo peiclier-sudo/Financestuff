@@ -334,77 +334,38 @@ export default function BacktestPage() {
     }
   }, [currentDay, revealedBarCount, dayComplete, tradingSize]);
 
-  // Challenge: track exits in real-time, complete immediately when target reached
+  // Challenge: track exits in real-time, complete when target reached AND no open positions remain
   const prevClosedTradesLenRef = useRef(0);
   useEffect(() => {
     if (!challenge || challenge.complete) return;
-    if (closedTrades.length === 0 || closedTrades.length === prevClosedTradesLenRef.current) return;
-    prevClosedTradesLenRef.current = closedTrades.length;
+    if (closedTrades.length === 0) return;
 
     // Count current day's exit events
     const dayExits = countExitEvents(closedTrades);
     const totalExits = challenge.totalExits + dayExits;
 
-    if (totalExits >= challenge.target) {
-      // Challenge target reached — force-close any remaining open positions first
-      // so they are included in the review
-      setPositions((prev) => {
-        if (prev.length === 0) {
-          // No open positions, finalize immediately
-          finalizeChallengeCompletion(closedTrades, dayExits, totalExits);
-          return prev;
-        }
-        const currentBar = currentDay!.bars[revealedBarCount - 1];
-        const forceClosed: ClosedTrade[] = prev.map((pos) => {
-          const mult = pos.direction === "long" ? 1 : -1;
-          const pnlPoints = (currentBar.close - pos.entryPrice) * mult;
-          return {
-            id: genId(),
-            direction: pos.direction,
-            entryPrice: pos.entryPrice,
-            entryTime: pos.entryTime,
-            exitPrice: currentBar.close,
-            exitTime: currentBar.time,
-            pnlPoints: pnlPoints * tradingSize,
-            pnlPercent: (pnlPoints / pos.entryPrice) * 100,
-            exitReason: "manual" as const,
-          };
-        });
-        // Add force-closed trades to state
-        const allDayTrades = [...closedTrades, ...forceClosed];
-        setClosedTrades(allDayTrades);
-        setSessionTrades((st) => [...st, ...forceClosed]);
-
-        // Finalize with all trades included
-        const finalExits = countExitEvents(allDayTrades);
-        const finalTotalExits = challenge.totalExits + finalExits;
-        finalizeChallengeCompletion(allDayTrades, finalExits, finalTotalExits);
-        return []; // clear all positions
-      });
+    if (totalExits >= challenge.target && positions.length === 0) {
+      // Target reached AND all positions are closed — finalize challenge
+      const updatedChallenge: ChallengeState = {
+        ...challenge,
+        days: [...challenge.days, {
+          date: currentDay!.date,
+          dayName: currentDay!.dayName,
+          changePercent: currentDay!.changePercent,
+          rangePercent: currentDay!.rangePercent,
+          trades: closedTrades,
+          exitCount: dayExits,
+        }],
+        allTrades: [...challenge.allTrades, ...closedTrades],
+        totalExits,
+        complete: true,
+      };
+      setChallenge(updatedChallenge);
+      saveChallenge(updatedChallenge);
+      setDayComplete(true);
+      setShowChallengeReview(true);
     }
-  }, [closedTrades, challenge, currentDay, revealedBarCount, tradingSize]);
-
-  const finalizeChallengeCompletion = useCallback((dayTrades: ClosedTrade[], dayExits: number, totalExits: number) => {
-    if (!challenge || !currentDay) return;
-    const updatedChallenge: ChallengeState = {
-      ...challenge,
-      days: [...challenge.days, {
-        date: currentDay.date,
-        dayName: currentDay.dayName,
-        changePercent: currentDay.changePercent,
-        rangePercent: currentDay.rangePercent,
-        trades: dayTrades,
-        exitCount: dayExits,
-      }],
-      allTrades: [...challenge.allTrades, ...dayTrades],
-      totalExits,
-      complete: true,
-    };
-    setChallenge(updatedChallenge);
-    saveChallenge(updatedChallenge);
-    setDayComplete(true);
-    setShowChallengeReview(true);
-  }, [challenge, currentDay]);
+  }, [closedTrades, challenge, currentDay, positions.length]);
 
   // Challenge: record day on day complete (only if challenge not already completed mid-day)
   const challengeDayRecordedRef = useRef(false);
