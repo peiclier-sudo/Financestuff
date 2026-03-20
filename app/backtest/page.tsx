@@ -346,27 +346,65 @@ export default function BacktestPage() {
     const totalExits = challenge.totalExits + dayExits;
 
     if (totalExits >= challenge.target) {
-      // Challenge target reached mid-day — stop immediately
-      const updatedChallenge: ChallengeState = {
-        ...challenge,
-        days: [...challenge.days, {
-          date: currentDay!.date,
-          dayName: currentDay!.dayName,
-          changePercent: currentDay!.changePercent,
-          rangePercent: currentDay!.rangePercent,
-          trades: closedTrades,
-          exitCount: dayExits,
-        }],
-        allTrades: [...challenge.allTrades, ...closedTrades],
-        totalExits,
-        complete: true,
-      };
-      setChallenge(updatedChallenge);
-      saveChallenge(updatedChallenge);
-      setDayComplete(true);
-      setShowChallengeReview(true);
+      // Challenge target reached — force-close any remaining open positions first
+      // so they are included in the review
+      setPositions((prev) => {
+        if (prev.length === 0) {
+          // No open positions, finalize immediately
+          finalizeChallengeCompletion(closedTrades, dayExits, totalExits);
+          return prev;
+        }
+        const currentBar = currentDay!.bars[revealedBarCount - 1];
+        const forceClosed: ClosedTrade[] = prev.map((pos) => {
+          const mult = pos.direction === "long" ? 1 : -1;
+          const pnlPoints = (currentBar.close - pos.entryPrice) * mult;
+          return {
+            id: genId(),
+            direction: pos.direction,
+            entryPrice: pos.entryPrice,
+            entryTime: pos.entryTime,
+            exitPrice: currentBar.close,
+            exitTime: currentBar.time,
+            pnlPoints: pnlPoints * tradingSize,
+            pnlPercent: (pnlPoints / pos.entryPrice) * 100,
+            exitReason: "manual" as const,
+          };
+        });
+        // Add force-closed trades to state
+        const allDayTrades = [...closedTrades, ...forceClosed];
+        setClosedTrades(allDayTrades);
+        setSessionTrades((st) => [...st, ...forceClosed]);
+
+        // Finalize with all trades included
+        const finalExits = countExitEvents(allDayTrades);
+        const finalTotalExits = challenge.totalExits + finalExits;
+        finalizeChallengeCompletion(allDayTrades, finalExits, finalTotalExits);
+        return []; // clear all positions
+      });
     }
-  }, [closedTrades, challenge, currentDay]);
+  }, [closedTrades, challenge, currentDay, revealedBarCount, tradingSize]);
+
+  const finalizeChallengeCompletion = useCallback((dayTrades: ClosedTrade[], dayExits: number, totalExits: number) => {
+    if (!challenge || !currentDay) return;
+    const updatedChallenge: ChallengeState = {
+      ...challenge,
+      days: [...challenge.days, {
+        date: currentDay.date,
+        dayName: currentDay.dayName,
+        changePercent: currentDay.changePercent,
+        rangePercent: currentDay.rangePercent,
+        trades: dayTrades,
+        exitCount: dayExits,
+      }],
+      allTrades: [...challenge.allTrades, ...dayTrades],
+      totalExits,
+      complete: true,
+    };
+    setChallenge(updatedChallenge);
+    saveChallenge(updatedChallenge);
+    setDayComplete(true);
+    setShowChallengeReview(true);
+  }, [challenge, currentDay]);
 
   // Challenge: record day on day complete (only if challenge not already completed mid-day)
   const challengeDayRecordedRef = useRef(false);

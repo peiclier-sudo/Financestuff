@@ -91,6 +91,7 @@ export default function ReplayChart({
   const timeRangeSetRef = useRef(false);
   const prevFirstBarTime = useRef<number>(0);
   const savedLogicalRange = useRef<{ from: number; to: number } | null>(null);
+  const [highlightRect, setHighlightRect] = useState<{ left: number; width: number; top: number; height: number } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersPluginRef = useRef<ISeriesMarkersPluginApi<any> | null>(null);
 
@@ -676,21 +677,58 @@ export default function ReplayChart({
     };
   }, [tradeLabels, posLabels]);
 
-  // Focus chart on trade range (for review mode)
+  // Focus chart on trade range (for review mode) — gentle zoom + highlight
   useEffect(() => {
     const chart = chartRef.current;
-    if (!chart || !focusRange) return;
+    const series = seriesRef.current;
+    if (!chart || !series || !focusRange) {
+      setHighlightRect(null);
+      return;
+    }
 
     // Find bar indices for entry and exit times
     const entryIdx = revealedBars.findIndex((b) => b.time >= focusRange.entryTime);
     const exitIdx = revealedBars.findIndex((b) => b.time >= focusRange.exitTime);
-    if (entryIdx < 0 || exitIdx < 0) return;
+    if (entryIdx < 0 || exitIdx < 0) {
+      setHighlightRect(null);
+      return;
+    }
 
-    // Add context bars on each side
-    const contextBars = 8;
+    // Gentle zoom — show the trade with generous context (roughly 40% of visible bars are context)
+    const tradeSpan = Math.max(exitIdx - entryIdx, 1);
+    const contextBars = Math.max(Math.round(tradeSpan * 1.2), 15);
     const from = Math.max(0, entryIdx - contextBars);
     const to = Math.min(revealedBars.length - 1, exitIdx + contextBars);
     chart.timeScale().setVisibleLogicalRange({ from, to });
+
+    // Compute highlight rect after zoom settles
+    const updateHighlight = () => {
+      const entryTime = revealedBars[entryIdx].time as UTCTimestamp;
+      const exitTime = revealedBars[exitIdx].time as UTCTimestamp;
+      const x1 = chart.timeScale().timeToCoordinate(entryTime);
+      const x2 = chart.timeScale().timeToCoordinate(exitTime);
+      if (x1 === null || x2 === null) { setHighlightRect(null); return; }
+
+      // Full chart height highlight
+      const container = containerRef.current;
+      if (!container) return;
+      const chartHeight = container.clientHeight;
+
+      const left = Math.min(x1 as number, x2 as number) - 4;
+      const width = Math.abs((x2 as number) - (x1 as number)) + 8;
+      setHighlightRect({ left, width, top: 0, height: chartHeight });
+    };
+
+    // Small delay so the zoom finishes before computing pixel coords
+    const timer = setTimeout(updateHighlight, 50);
+
+    // Also update on scroll/zoom
+    chart.timeScale().subscribeVisibleLogicalRangeChange(updateHighlight);
+
+    return () => {
+      clearTimeout(timer);
+      try { chart.timeScale().unsubscribeVisibleLogicalRangeChange(updateHighlight); } catch {}
+    };
   }, [focusRange, revealedBars]);
 
   // Handle right-click for context menu
@@ -1112,6 +1150,27 @@ export default function ReplayChart({
           ))}
         </div>
       </div>
+
+      {/* Trade highlight overlay for review mode */}
+      {highlightRect && (
+        <>
+          {/* Dimmed areas outside the highlight */}
+          <div className="absolute inset-0 z-10 pointer-events-none" style={{
+            background: "rgba(0, 0, 0, 0.35)",
+            clipPath: `polygon(0 0, 100% 0, 100% 100%, 0 100%, 0 0, ${highlightRect.left}px 0, ${highlightRect.left}px 100%, ${highlightRect.left + highlightRect.width}px 100%, ${highlightRect.left + highlightRect.width}px 0, ${highlightRect.left}px 0)`,
+          }} />
+          {/* Highlight border lines */}
+          <div className="absolute z-10 pointer-events-none" style={{
+            left: highlightRect.left,
+            top: 0,
+            width: highlightRect.width,
+            height: highlightRect.height,
+            borderLeft: "1.5px solid rgba(255, 255, 255, 0.25)",
+            borderRight: "1.5px solid rgba(255, 255, 255, 0.25)",
+            background: "rgba(255, 255, 255, 0.03)",
+          }} />
+        </>
+      )}
 
       {/* Context Menu */}
       {contextMenu && (
