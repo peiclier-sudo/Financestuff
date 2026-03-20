@@ -77,7 +77,13 @@ export default function BacktestPage() {
   // Load challenge from localStorage on mount
   useEffect(() => {
     const saved = loadChallenge();
-    if (saved && !saved.complete) setChallenge(saved);
+    if (saved && !saved.complete) {
+      setChallenge(saved);
+      // Restore session trades from persisted challenge data
+      if (saved.allTrades.length > 0) {
+        setSessionTrades(saved.allTrades);
+      }
+    }
   }, []);
 
   // Pool filter
@@ -381,17 +387,54 @@ export default function BacktestPage() {
   const challengeDayRecordedRef = useRef(false);
   useEffect(() => {
     if (!dayComplete || !challenge || challenge.complete || challengeDayRecordedRef.current) return;
-    const timer = setTimeout(() => {
+    // Record immediately (no timeout) — React 18 batches all state updates from advanceBar
+    // so closedTrades already includes EOD trades when this effect fires
+    setClosedTrades((currentDayTrades) => {
+      if (currentDayTrades.length > 0) {
+        const exitCount = countExitEvents(currentDayTrades);
+        const updatedChallenge: ChallengeState = {
+          ...challenge,
+          days: [...challenge.days, {
+            date: currentDay!.date,
+            dayName: currentDay!.dayName,
+            changePercent: currentDay!.changePercent,
+            rangePercent: currentDay!.rangePercent,
+            trades: currentDayTrades,
+            exitCount,
+          }],
+          allTrades: [...challenge.allTrades, ...currentDayTrades],
+          totalExits: challenge.totalExits + exitCount,
+          complete: false,
+        };
+        setChallenge(updatedChallenge);
+        saveChallenge(updatedChallenge);
+      }
+      return currentDayTrades;
+    });
+    challengeDayRecordedRef.current = true;
+  }, [dayComplete, challenge, currentDay]);
+
+  // Reset the recorded flag when day changes
+  useEffect(() => {
+    challengeDayRecordedRef.current = false;
+  }, [currentDay?.date]);
+
+  // Challenge: auto-advance to next day (only if not complete, not reviewing)
+  const challengeNextDay = useCallback(() => {
+    if (!challenge || challenge.complete) return;
+
+    // Safety: if the day wasn't recorded yet, record it now before advancing
+    if (!challengeDayRecordedRef.current && currentDay) {
       setClosedTrades((currentDayTrades) => {
         if (currentDayTrades.length > 0) {
           const exitCount = countExitEvents(currentDayTrades);
           const updatedChallenge: ChallengeState = {
             ...challenge,
             days: [...challenge.days, {
-              date: currentDay!.date,
-              dayName: currentDay!.dayName,
-              changePercent: currentDay!.changePercent,
-              rangePercent: currentDay!.rangePercent,
+              date: currentDay.date,
+              dayName: currentDay.dayName,
+              changePercent: currentDay.changePercent,
+              rangePercent: currentDay.rangePercent,
               trades: currentDayTrades,
               exitCount,
             }],
@@ -405,18 +448,8 @@ export default function BacktestPage() {
         return currentDayTrades;
       });
       challengeDayRecordedRef.current = true;
-    }, 100);
-    return () => clearTimeout(timer);
-  }, [dayComplete, challenge, currentDay]);
+    }
 
-  // Reset the recorded flag when day changes
-  useEffect(() => {
-    challengeDayRecordedRef.current = false;
-  }, [currentDay?.date]);
-
-  // Challenge: auto-advance to next day (only if not complete, not reviewing)
-  const challengeNextDay = useCallback(() => {
-    if (!challenge || challenge.complete) return;
     const day = pickRandomDay(dayPool);
     if (day) {
       setCurrentDay(day);
@@ -426,7 +459,7 @@ export default function BacktestPage() {
       setPositions([]);
       setClosedTrades([]);
     }
-  }, [challenge, dayPool]);
+  }, [challenge, dayPool, currentDay]);
 
   // Keyboard shortcuts
   useEffect(() => {
