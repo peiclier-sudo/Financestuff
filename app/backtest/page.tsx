@@ -40,11 +40,15 @@ export interface Instrument {
   id: string;
   label: string;
   file: string;
+  category: string;
+  description: string;
+  color: string;
 }
 
 export const INSTRUMENTS: Instrument[] = [
-  { id: "nasdaq", label: "NASDAQ", file: "/NASDAQ_5min_NDX_From_2015.csv" },
-  { id: "copper", label: "COPPER", file: "/HG_5min_2020_Futures.csv" },
+  { id: "nasdaq", label: "NASDAQ", file: "/NASDAQ_5min_NDX_From_2015.csv", category: "Index", description: "NDX 5min from 2015", color: "100,180,255" },
+  { id: "copper", label: "COPPER", file: "/HG_5min_2020_Futures.csv", category: "Commodity", description: "HG Futures 5min from 2020", color: "220,160,80" },
+  { id: "dax", label: "DAX", file: "/DAX_1min_06-24.csv", category: "Index", description: "DAX 1min 2006–2024", color: "255,200,60" },
 ];
 
 let idCounter = 0;
@@ -662,7 +666,7 @@ export default function BacktestPage() {
               Select an instrument to trade
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             {INSTRUMENTS.map((inst) => (
               <button
                 key={inst.id}
@@ -674,19 +678,19 @@ export default function BacktestPage() {
                 }}
               >
                 <div className="absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity" style={{
-                  background: "radial-gradient(ellipse at center, rgba(255,255,255,0.06) 0%, transparent 70%)",
+                  background: `radial-gradient(ellipse at center, rgba(${inst.color},0.06) 0%, transparent 70%)`,
                 }} />
                 <div className="relative">
                   <div className="text-[11px] font-mono uppercase tracking-widest mb-2" style={{
-                    color: inst.id === "nasdaq" ? "rgba(100,180,255,0.7)" : "rgba(220,160,80,0.7)",
+                    color: `rgba(${inst.color},0.7)`,
                   }}>
-                    {inst.id === "nasdaq" ? "Index" : "Commodity"}
+                    {inst.category}
                   </div>
                   <div className="text-lg font-display font-bold tracking-tight" style={{ color: "rgba(255,255,255,0.9)" }}>
                     {inst.label}
                   </div>
                   <div className="text-[10px] mt-1" style={{ color: "rgba(255,255,255,0.3)" }}>
-                    {inst.id === "nasdaq" ? "NDX 5min from 2015" : "HG Futures 5min from 2020"}
+                    {inst.description}
                   </div>
                 </div>
               </button>
@@ -763,8 +767,8 @@ export default function BacktestPage() {
             }}
             className="text-[9px] font-mono font-bold px-2 py-0.5 rounded transition-colors hover:bg-white/10"
             style={{
-              color: selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.8)" : "rgba(220,160,80,0.8)",
-              border: `1px solid ${selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.2)" : "rgba(220,160,80,0.2)"}`,
+              color: `rgba(${selectedInstrument.color},0.8)`,
+              border: `1px solid rgba(${selectedInstrument.color},0.2)`,
             }}
             title="Change instrument"
           >
@@ -775,8 +779,8 @@ export default function BacktestPage() {
           <span
             className="text-[9px] font-mono font-bold px-2 py-0.5 rounded"
             style={{
-              color: selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.6)" : "rgba(220,160,80,0.6)",
-              border: `1px solid ${selectedInstrument.id === "nasdaq" ? "rgba(100,180,255,0.12)" : "rgba(220,160,80,0.12)"}`,
+              color: `rgba(${selectedInstrument.color},0.6)`,
+              border: `1px solid rgba(${selectedInstrument.color},0.12)`,
             }}
           >
             {selectedInstrument.label}
