@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 
 interface Props {
   onClose: () => void;
@@ -15,6 +16,14 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const emailRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    // Auto-focus email field
+    setTimeout(() => emailRef.current?.focus(), 50);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,13 +45,22 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}>
-      <div className="w-full max-w-sm rounded-xl overflow-hidden" style={{
-        background: "rgba(18,22,30,0.98)",
-        border: "1px solid rgba(255,255,255,0.08)",
-        boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
-      }}>
+  const modal = (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(8px)" }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <div
+        className="w-full max-w-sm mx-4 rounded-xl overflow-hidden"
+        style={{
+          background: "rgba(18,22,30,0.98)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 24px 48px rgba(0,0,0,0.5)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
           <h2 className="text-sm font-display font-bold" style={{ color: "rgba(255,255,255,0.9)" }}>
@@ -54,6 +72,7 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
         {/* Tabs */}
         <div className="flex px-5 pt-3 gap-4">
           <button
+            type="button"
             onClick={() => { setMode("signin"); setError(null); setSuccess(null); }}
             className="text-[11px] font-mono pb-2 transition-colors"
             style={{
@@ -64,6 +83,7 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
             Sign In
           </button>
           <button
+            type="button"
             onClick={() => { setMode("signup"); setError(null); setSuccess(null); }}
             className="text-[11px] font-mono pb-2 transition-colors"
             style={{
@@ -80,11 +100,14 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
           <div>
             <label className="text-[9px] uppercase tracking-wider block mb-1" style={{ color: "rgba(255,255,255,0.35)" }}>Email</label>
             <input
+              ref={emailRef}
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
               required
-              className="w-full text-[12px] font-mono px-3 py-2 rounded-lg outline-none transition-colors"
+              autoComplete="email"
+              className="w-full text-[12px] font-mono px-3 py-2 rounded-lg outline-none transition-colors focus:ring-1 focus:ring-white/20"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -99,9 +122,11 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyDown={(e) => e.stopPropagation()}
               required
               minLength={6}
-              className="w-full text-[12px] font-mono px-3 py-2 rounded-lg outline-none transition-colors"
+              autoComplete={mode === "signin" ? "current-password" : "new-password"}
+              className="w-full text-[12px] font-mono px-3 py-2 rounded-lg outline-none transition-colors focus:ring-1 focus:ring-white/20"
               style={{
                 background: "rgba(255,255,255,0.04)",
                 border: "1px solid rgba(255,255,255,0.1)",
@@ -139,4 +164,8 @@ export default function AuthModal({ onClose, onSignIn, onSignUp }: Props) {
       </div>
     </div>
   );
+
+  // Portal to document.body so it's not clipped by parent containers
+  if (!mounted) return null;
+  return createPortal(modal, document.body);
 }
