@@ -25,6 +25,7 @@ import OrderPanel from "./components/OrderPanel";
 import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayReviewModal from "./components/DayReviewModal";
 import ChallengeReviewModal from "./components/ChallengeReviewModal";
+import ChallengeHistoryModal from "./components/ChallengeHistoryModal";
 import AuthButton from "../components/AuthButton";
 import DayPoolFilter from "./components/DayPoolFilter";
 import PeriodSelector from "./components/PeriodSelector";
@@ -91,6 +92,7 @@ export default function BacktestPage() {
   // Challenge mode
   const [challenge, setChallenge] = useState<ChallengeState | null>(null);
   const [showChallengeReview, setShowChallengeReview] = useState(false);
+  const [showChallengeHistory, setShowChallengeHistory] = useState(false);
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
 
   // Load challenge from localStorage on mount
@@ -870,6 +872,13 @@ export default function BacktestPage() {
           Filter
         </button>
 
+        <button
+          onClick={() => setShowChallengeHistory(true)}
+          className="text-[10px] py-1 px-2 rounded transition-colors text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+        >
+          History
+        </button>
+
         {currentDay && (
           <>
             <div className="w-px h-4 bg-[var(--border)]" />
@@ -1122,6 +1131,11 @@ export default function BacktestPage() {
           }}
           onFocusTrade={(entryTime, exitTime) => setReviewFocusRange({ entryTime, exitTime })}
         />
+      )}
+
+      {/* Challenge History Modal */}
+      {showChallengeHistory && (
+        <ChallengeHistoryModal onClose={() => setShowChallengeHistory(false)} />
       )}
 
       {/* Quit Challenge Confirmation */}
