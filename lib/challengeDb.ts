@@ -46,24 +46,41 @@ export interface ChallengeHistoryRow {
   target: number;
   days_played: number;
   total_trades: number;
+  total_exits: number;
+  winners: number;
+  losers: number;
   win_rate: number;
   total_pnl: number;
+  avg_win: number;
+  avg_loss: number;
   profit_factor: number;
+  max_drawdown: number;
+  max_runup: number;
+  best_trade: number;
+  worst_trade: number;
+  avg_pnl: number;
   overall_rating: number;
   submitted_at: string;
+  trade_group_reviews: unknown;
 }
 
-export async function loadChallengeHistory(): Promise<{ data: ChallengeHistoryRow[]; error: string | null }> {
+export async function loadChallengeHistory(target?: number): Promise<{ data: ChallengeHistoryRow[]; error: string | null }> {
   if (!supabase) return { data: [], error: "Supabase not configured" };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: "Not signed in" };
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("challenge_reviews")
-    .select("id, challenge_id, instrument, target, days_played, total_trades, win_rate, total_pnl, profit_factor, overall_rating, submitted_at")
+    .select("id, challenge_id, instrument, target, days_played, total_trades, total_exits, winners, losers, win_rate, total_pnl, avg_win, avg_loss, profit_factor, max_drawdown, max_runup, best_trade, worst_trade, avg_pnl, overall_rating, submitted_at, trade_group_reviews")
     .order("submitted_at", { ascending: false })
-    .limit(50);
+    .limit(100);
+
+  if (target) {
+    query = query.eq("target", target);
+  }
+
+  const { data, error } = await query;
 
   return { data: data ?? [], error: error?.message ?? null };
 }
