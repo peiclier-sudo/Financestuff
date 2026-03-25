@@ -39,6 +39,8 @@ export interface ChallengeReview {
   overallRating: number;
   /** Overall notes */
   overallNotes: string;
+  /** Instrument traded (e.g. "NASDAQ", "COPPER") */
+  instrument?: string;
   /** Computed stats */
   stats: {
     totalTrades: number;

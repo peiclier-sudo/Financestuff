@@ -25,6 +25,7 @@ import OrderPanel from "./components/OrderPanel";
 import PerformanceOverlay from "./components/PerformanceOverlay";
 import DayReviewModal from "./components/DayReviewModal";
 import ChallengeReviewModal from "./components/ChallengeReviewModal";
+import AuthButton from "../components/AuthButton";
 import DayPoolFilter from "./components/DayPoolFilter";
 import PeriodSelector from "./components/PeriodSelector";
 import {
@@ -917,6 +918,8 @@ export default function BacktestPage() {
           <span className="text-[var(--text-dim)]">
             Space/&rarr; = next bar | M = buy | N = sell | Shift+click = order
           </span>
+          <div className="w-px h-4 bg-[var(--border)]" />
+          <AuthButton />
         </div>
       </div>
 
@@ -1109,6 +1112,7 @@ export default function BacktestPage() {
       {showChallengeReview && challenge && challenge.complete && (
         <ChallengeReviewModal
           challenge={challenge}
+          instrument={selectedInstrument?.label}
           onClose={() => {
             setShowChallengeReview(false);
             setReviewFocusRange(null);

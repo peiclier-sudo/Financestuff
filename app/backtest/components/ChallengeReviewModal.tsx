@@ -4,14 +4,17 @@ import { useState, useMemo, useCallback, useEffect } from "react";
 import { ClosedTrade } from "@/lib/backtestTypes";
 import { REVIEW_TAGS, TradeGroupReview, ReviewTag } from "@/lib/reviewTypes";
 import { ChallengeState, ChallengeReview, computeChallengeStats } from "@/lib/challengeTypes";
+import { useAuth } from "@/lib/useAuth";
+import { saveChallengeReview } from "@/lib/challengeDb";
 
 interface Props {
   challenge: ChallengeState;
+  instrument?: string;
   onClose: () => void;
   onFocusTrade: (entryTime: number, exitTime: number) => void;
 }
 
-export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade }: Props) {
+export default function ChallengeReviewModal({ challenge, instrument, onClose, onFocusTrade }: Props) {
   const allTrades = challenge.allTrades;
 
   // Group trades by exit time (like DayReviewModal) — each group is one "trade" to review
@@ -43,6 +46,11 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
   const [overallRating, setOverallRating] = useState(3);
   const [overallNotes, setOverallNotes] = useState("");
   const [customTagInput, setCustomTagInput] = useState("");
+
+  // Supabase save state
+  const { user } = useAuth();
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const stats = useMemo(() => computeChallengeStats(allTrades), [allTrades]);
   const currentGroup = tradeGroups[currentIdx];
@@ -136,15 +144,29 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
       tradeGroupReviews,
       overallRating,
       overallNotes,
+      instrument,
       stats,
       submittedAt: Date.now(),
     };
-  }, [tradeGroups, groupReviews, challenge, overallRating, overallNotes, stats]);
+  }, [tradeGroups, groupReviews, challenge, overallRating, overallNotes, instrument, stats]);
 
   const handleDownloadPdf = useCallback(async () => {
     const review = buildReview();
     const { generateChallengePdf } = await import("@/lib/challengePdf");
     generateChallengePdf(review);
+  }, [buildReview]);
+
+  const handleSave = useCallback(async () => {
+    setSaveStatus("saving");
+    setSaveError(null);
+    const review = buildReview();
+    const { error } = await saveChallengeReview(review);
+    if (error) {
+      setSaveStatus("error");
+      setSaveError(error);
+    } else {
+      setSaveStatus("saved");
+    }
   }, [buildReview]);
 
   useEffect(() => {
@@ -442,11 +464,34 @@ export default function ChallengeReviewModal({ challenge, onClose, onFocusTrade 
           <div className="flex-1" />
 
           {step === "summary" && (
-            <button onClick={handleDownloadPdf}
-              className="text-[11px] font-mono font-semibold px-5 py-2 rounded transition-colors hover:brightness-110"
-              style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.95)" }}>
-              Download PDF
-            </button>
+            <>
+              {user ? (
+                <button
+                  onClick={handleSave}
+                  disabled={saveStatus === "saving" || saveStatus === "saved"}
+                  className="text-[11px] font-mono font-semibold px-5 py-2 rounded transition-colors hover:brightness-110 disabled:opacity-50"
+                  style={{
+                    background: saveStatus === "saved" ? "rgba(63,185,80,0.15)" : "rgba(255,255,255,0.14)",
+                    border: `1px solid ${saveStatus === "saved" ? "rgba(63,185,80,0.3)" : saveStatus === "error" ? "rgba(248,81,73,0.3)" : "rgba(255,255,255,0.25)"}`,
+                    color: saveStatus === "saved" ? "#3fb950" : saveStatus === "error" ? "#f85149" : "rgba(255,255,255,0.95)",
+                  }}
+                >
+                  {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved" : saveStatus === "error" ? "Retry Save" : "Save to Account"}
+                </button>
+              ) : (
+                <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
+                  Sign in to save
+                </span>
+              )}
+              {saveError && (
+                <span className="text-[9px]" style={{ color: "#f85149" }}>{saveError}</span>
+              )}
+              <button onClick={handleDownloadPdf}
+                className="text-[11px] font-mono font-semibold px-5 py-2 rounded transition-colors hover:brightness-110"
+                style={{ background: "rgba(255,255,255,0.14)", border: "1px solid rgba(255,255,255,0.25)", color: "rgba(255,255,255,0.95)" }}>
+                Download PDF
+              </button>
+            </>
           )}
 
           {step === "trades" && (
