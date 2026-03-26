@@ -64,23 +64,17 @@ export interface ChallengeHistoryRow {
   trade_group_reviews: unknown;
 }
 
-export async function loadChallengeHistory(target?: number): Promise<{ data: ChallengeHistoryRow[]; error: string | null }> {
+export async function loadChallengeHistory(): Promise<{ data: ChallengeHistoryRow[]; error: string | null }> {
   if (!supabase) return { data: [], error: "Supabase not configured" };
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { data: [], error: "Not signed in" };
 
-  let query = supabase
+  const { data, error } = await supabase
     .from("challenge_reviews")
     .select("id, challenge_id, instrument, target, days_played, total_trades, total_exits, winners, losers, win_rate, total_pnl, avg_win, avg_loss, profit_factor, max_drawdown, max_runup, best_trade, worst_trade, avg_pnl, overall_rating, submitted_at, trade_group_reviews")
     .order("submitted_at", { ascending: false })
-    .limit(100);
-
-  if (target) {
-    query = query.eq("target", target);
-  }
-
-  const { data, error } = await query;
+    .limit(200);
 
   return { data: data ?? [], error: error?.message ?? null };
 }

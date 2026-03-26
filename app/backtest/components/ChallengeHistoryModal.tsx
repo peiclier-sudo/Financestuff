@@ -56,10 +56,11 @@ const EDGE_LABELS: Record<string, string> = { fade: "Fade", breakout: "Breakout"
 const EXEC_LABELS: Record<string, string> = { added: "Added to Winner", not_added: "Not Added" };
 
 export default function ChallengeHistoryModal({ onClose }: Props) {
-  const [rows, setRows] = useState<ChallengeHistoryRow[]>([]);
+  const [allRows, setAllRows] = useState<ChallengeHistoryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterTarget, setFilterTarget] = useState<number | null>(null);
+  const [filterInstrument, setFilterInstrument] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [view, setView] = useState<View>("overview");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -68,12 +69,51 @@ export default function ChallengeHistoryModal({ onClose }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    loadChallengeHistory(filterTarget ?? undefined).then(({ data, error: err }) => {
-      setRows(data);
+    loadChallengeHistory().then(({ data, error: err }) => {
+      setAllRows(data);
       setError(err);
       setLoading(false);
     });
-  }, [filterTarget]);
+  }, []);
+
+  // Extract unique instruments and targets from data
+  const instruments = useMemo(() =>
+    [...new Set(allRows.map((r) => r.instrument).filter(Boolean))].sort() as string[],
+    [allRows]
+  );
+  const targets = useMemo(() =>
+    [...new Set(allRows.map((r) => r.target))].sort((a, b) => a - b),
+    [allRows]
+  );
+
+  // Client-side filtered rows
+  const rows = useMemo(() =>
+    allRows.filter((r) => {
+      if (filterTarget && r.target !== filterTarget) return false;
+      if (filterInstrument && r.instrument !== filterInstrument) return false;
+      return true;
+    }),
+    [allRows, filterTarget, filterInstrument]
+  );
+
+  // Segment cards: every instrument × target combo
+  const segments = useMemo(() => {
+    const map = new Map<string, ChallengeHistoryRow[]>();
+    for (const r of allRows) {
+      const key = `${r.instrument ?? "Unknown"}|${r.target}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(r);
+    }
+    return [...map.entries()].map(([key, segRows]) => {
+      const [inst, target] = key.split("|");
+      const pnl = segRows.reduce((s, r) => s + r.total_pnl, 0);
+      const trades = segRows.reduce((s, r) => s + r.total_trades, 0);
+      const wins = segRows.reduce((s, r) => s + r.winners, 0);
+      const winRate = trades > 0 ? (wins / trades) * 100 : 0;
+      const profitablePct = segRows.length > 0 ? (segRows.filter((r) => r.total_pnl > 0).length / segRows.length) * 100 : 0;
+      return { inst, target: Number(target), count: segRows.length, pnl, trades, winRate, profitablePct };
+    }).sort((a, b) => a.inst.localeCompare(b.inst) || a.target - b.target);
+  }, [allRows]);
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -229,21 +269,57 @@ export default function ChallengeHistoryModal({ onClose }: Props) {
           </div>
           <div className="flex items-center gap-3">
             {view === "overview" && (
-              <div className="flex gap-1">
-                {[null, 15, 30].map((t) => (
-                  <button
-                    key={String(t)}
-                    onClick={() => setFilterTarget(t)}
-                    className="text-[10px] font-mono px-2.5 py-1 rounded-full transition-all"
-                    style={{
-                      background: filterTarget === t ? "rgba(255,255,255,0.12)" : "transparent",
-                      border: `1px solid ${filterTarget === t ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}`,
-                      color: filterTarget === t ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
-                    }}
-                  >
-                    {t === null ? "All" : `${t} Trades`}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                {/* Target filter */}
+                <div className="flex gap-1">
+                  {[null, ...targets].map((t) => (
+                    <button
+                      key={String(t)}
+                      onClick={() => setFilterTarget(t)}
+                      className="text-[9px] font-mono px-2 py-0.5 rounded-full transition-all"
+                      style={{
+                        background: filterTarget === t ? "rgba(255,255,255,0.12)" : "transparent",
+                        border: `1px solid ${filterTarget === t ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}`,
+                        color: filterTarget === t ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
+                      }}
+                    >
+                      {t === null ? "All" : `${t} Trades`}
+                    </button>
+                  ))}
+                </div>
+                {/* Instrument filter */}
+                {instruments.length > 0 && (
+                  <>
+                    <div className="w-px h-3" style={{ background: "rgba(255,255,255,0.1)" }} />
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setFilterInstrument(null)}
+                        className="text-[9px] font-mono px-2 py-0.5 rounded-full transition-all"
+                        style={{
+                          background: filterInstrument === null ? "rgba(255,255,255,0.12)" : "transparent",
+                          border: `1px solid ${filterInstrument === null ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}`,
+                          color: filterInstrument === null ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
+                        }}
+                      >
+                        All
+                      </button>
+                      {instruments.map((inst) => (
+                        <button
+                          key={inst}
+                          onClick={() => setFilterInstrument(inst)}
+                          className="text-[9px] font-mono px-2 py-0.5 rounded-full transition-all"
+                          style={{
+                            background: filterInstrument === inst ? "rgba(255,255,255,0.12)" : "transparent",
+                            border: `1px solid ${filterInstrument === inst ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.06)"}`,
+                            color: filterInstrument === inst ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
+                          }}
+                        >
+                          {inst}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
             <button onClick={onClose} className="text-[var(--text-dim)] hover:text-white transition-colors text-lg leading-none">&times;</button>
@@ -277,6 +353,71 @@ export default function ChallengeHistoryModal({ onClose }: Props) {
           {/* ===== OVERVIEW ===== */}
           {!loading && view === "overview" && agg && (
             <>
+              {/* Segment cards — shown when not fully filtered */}
+              {segments.length > 1 && (filterTarget === null || filterInstrument === null) && (
+                <div>
+                  <SectionLabel>Performance by Instrument &times; Challenge</SectionLabel>
+                  <div className="grid grid-cols-3 gap-2">
+                    {segments.map((seg) => {
+                      const isActive = filterTarget === seg.target && filterInstrument === seg.inst;
+                      return (
+                        <button
+                          key={`${seg.inst}-${seg.target}`}
+                          onClick={() => { setFilterTarget(seg.target); setFilterInstrument(seg.inst); }}
+                          className="text-left p-3 rounded-lg transition-all hover:brightness-110"
+                          style={{
+                            background: isActive ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.02)",
+                            border: `1px solid ${isActive ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.06)"}`,
+                          }}
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-[10px] font-mono font-bold" style={{ color: "rgba(255,255,255,0.8)" }}>
+                              {seg.inst}
+                            </span>
+                            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded" style={{
+                              background: "rgba(255,255,255,0.06)",
+                              color: "rgba(255,255,255,0.45)",
+                            }}>
+                              {seg.target} trades
+                            </span>
+                          </div>
+                          <div className="text-[16px] font-mono font-bold" style={{ color: seg.pnl >= 0 ? "#3fb950" : "#f85149" }}>
+                            {seg.pnl >= 0 ? "+" : ""}${seg.pnl.toFixed(1)}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                              {seg.count} chall.
+                            </span>
+                            <span className="text-[9px] font-mono" style={{ color: seg.winRate >= 50 ? "rgba(63,185,80,0.7)" : "rgba(248,81,73,0.7)" }}>
+                              {seg.winRate.toFixed(0)}% win
+                            </span>
+                            <span className="text-[9px] font-mono" style={{ color: "rgba(255,255,255,0.25)" }}>
+                              {seg.profitablePct.toFixed(0)}% prof.
+                            </span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Active filter label */}
+              {(filterTarget !== null || filterInstrument !== null) && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
+                    Showing: {filterInstrument ?? "All instruments"} &middot; {filterTarget ? `Challenge ${filterTarget}` : "All targets"}
+                  </span>
+                  <button
+                    onClick={() => { setFilterTarget(null); setFilterInstrument(null); }}
+                    className="text-[9px] font-mono px-2 py-0.5 rounded transition-colors hover:bg-white/10"
+                    style={{ color: "rgba(255,255,255,0.35)", border: "1px solid rgba(255,255,255,0.08)" }}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+
               {/* Hero P&L */}
               <div className="text-center py-2">
                 <div className="text-[36px] font-mono font-bold tracking-tight" style={{ color: agg.totalPnl >= 0 ? "#3fb950" : "#f85149" }}>
