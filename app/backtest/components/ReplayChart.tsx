@@ -681,7 +681,7 @@ export default function ReplayChart({
   useEffect(() => {
     const chart = chartRef.current;
     const series = seriesRef.current;
-    if (!chart || !series || !focusRange) {
+    if (!chart || !series || !focusRange || (focusRange.entryTime === 0 && focusRange.exitTime === 0)) {
       setHighlightRect(null);
       return;
     }

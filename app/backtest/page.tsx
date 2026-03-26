@@ -1122,6 +1122,7 @@ export default function BacktestPage() {
         <ChallengeReviewModal
           challenge={challenge}
           instrument={selectedInstrument?.label}
+          currentDayBars={currentDay?.bars}
           onClose={() => {
             setShowChallengeReview(false);
             setReviewFocusRange(null);

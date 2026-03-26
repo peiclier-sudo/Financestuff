@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from "react";
 import { ClosedTrade } from "@/lib/backtestTypes";
+import { Bar } from "@/lib/types";
 import { TradeGroupReview } from "@/lib/reviewTypes";
 import { ChallengeState, ChallengeReview, computeChallengeStats } from "@/lib/challengeTypes";
 import { useAuth } from "@/lib/useAuth";
@@ -34,11 +35,12 @@ const EDGE_LABELS: Record<string, string> = {
 interface Props {
   challenge: ChallengeState;
   instrument?: string;
+  currentDayBars?: Bar[];
   onClose: () => void;
   onFocusTrade: (entryTime: number, exitTime: number) => void;
 }
 
-export default function ChallengeReviewModal({ challenge, instrument, onClose, onFocusTrade }: Props) {
+export default function ChallengeReviewModal({ challenge, instrument, currentDayBars, onClose, onFocusTrade }: Props) {
   const allTrades = challenge.allTrades;
 
   // Group trades by exit time
@@ -79,13 +81,26 @@ export default function ChallengeReviewModal({ challenge, instrument, onClose, o
     ? currentGroup.trades.reduce((s, t) => s + t.pnlPoints, 0)
     : 0;
 
-  // Focus chart on current trade
+  // Focus chart on current trade — only if it belongs to the currently displayed day
   useEffect(() => {
     if (step === "trades" && currentGroup) {
       const earliest = Math.min(...currentGroup.trades.map((t) => t.entryTime));
-      onFocusTrade(earliest, currentGroup.exitTime);
+      const exitTime = currentGroup.exitTime;
+
+      // Check if this trade's timestamps fall within the current day's bars
+      if (currentDayBars && currentDayBars.length > 0) {
+        const dayStart = currentDayBars[0].time;
+        const dayEnd = currentDayBars[currentDayBars.length - 1].time;
+        if (earliest < dayStart || exitTime > dayEnd) {
+          // Trade is from a different day — clear focus
+          onFocusTrade(0, 0);
+          return;
+        }
+      }
+
+      onFocusTrade(earliest, exitTime);
     }
-  }, [step, currentIdx, currentGroup, onFocusTrade]);
+  }, [step, currentIdx, currentGroup, onFocusTrade, currentDayBars]);
 
   const updateReview = useCallback((exitTime: number, patch: Partial<TradeReview>) => {
     setReviews((prev) => {
@@ -291,6 +306,26 @@ export default function ChallengeReviewModal({ challenge, instrument, onClose, o
           {step === "trades" && currentGroup && currentReview && (
             <>
               {/* Trade info */}
+              {(() => {
+                const earliest = Math.min(...currentGroup.trades.map((t) => t.entryTime));
+                const isOnChart = !currentDayBars || currentDayBars.length === 0 || (
+                  earliest >= currentDayBars[0].time && currentGroup.exitTime <= currentDayBars[currentDayBars.length - 1].time
+                );
+                const tradeDate = new Date(earliest * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" });
+                return (
+                  <>
+                    {!isOnChart && (
+                      <div className="text-[9px] font-mono px-2.5 py-1 rounded" style={{
+                        background: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        color: "rgba(255,255,255,0.35)",
+                      }}>
+                        {tradeDate} — not on current chart
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
               <div className="flex items-center gap-3">
                 <div className="text-[12px] font-mono font-bold px-2.5 py-1 rounded" style={{
                   background: groupPnl >= 0 ? "rgba(63,185,80,0.12)" : "rgba(248,81,73,0.12)",
@@ -300,6 +335,8 @@ export default function ChallengeReviewModal({ challenge, instrument, onClose, o
                   {groupPnl >= 0 ? "+" : ""}${groupPnl.toFixed(2)}
                 </div>
                 <span className="text-[11px] font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+                  {new Date(Math.min(...currentGroup.trades.map((t) => t.entryTime)) * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "America/New_York" })}
+                  {" "}
                   {formatTime(Math.min(...currentGroup.trades.map((t) => t.entryTime)))}
                   {" → "}
                   {formatTime(currentGroup.exitTime)}
